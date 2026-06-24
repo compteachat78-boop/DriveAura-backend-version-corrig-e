@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<script src="/config.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DriveAura — War Room</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+  *{box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:#020817;color:#e2e8f0;overflow-x:hidden;}
+  .font-orbitron{font-family:'Orbitron',monospace;}
+  .neon-text{text-shadow:0 0 20px #6366f1,0 0 40px #6366f1;}
+  .glow-btn{background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 0 20px rgba(99,102,241,0.4);transition:all 0.3s;}
+  .glow-btn:hover{box-shadow:0 0 35px rgba(99,102,241,0.7);transform:translateY(-1px);}
+  .card{background:rgba(15,23,42,0.9);border:1px solid rgba(99,102,241,0.2);}
+  .grid-bg{background-image:linear-gradient(rgba(99,102,241,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.04) 1px,transparent 1px);background-size:40px 40px;}
+  .tab-btn{transition:all 0.2s;}
+  .tab-btn.active{background:rgba(99,102,241,0.2);border-color:#6366f1;color:#818cf8;}
+  .status-badge{padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;}
+  .badge-pending{background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);}
+  .badge-valide{background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);}
+  .badge-rejete{background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);}
+  .input-dark{background:rgba(15,23,42,0.8);border:1px solid rgba(99,102,241,0.25);color:#e2e8f0;padding:8px 12px;border-radius:8px;transition:all 0.3s;width:100%;}
+  .input-dark:focus{outline:none;border-color:#6366f1;box-shadow:0 0 10px rgba(99,102,241,0.2);}
+  .wa-orb{width:12px;height:12px;border-radius:50%;background:#374151;transition:all 0.5s;}
+  .wa-orb.connected{background:#10b981;box-shadow:0 0 15px #10b981;animation:waPulse 2s infinite;}
+  @keyframes waPulse{0%,100%{box-shadow:0 0 8px #10b981;}50%{box-shadow:0 0 25px #10b981;}}
+  .fade-in{animation:fadeIn 0.3s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  .dossier-row{transition:all 0.2s;cursor:pointer;}
+  .dossier-row:hover{background:rgba(99,102,241,0.08);}
+  ::-webkit-scrollbar{width:4px;height:4px;}
+  ::-webkit-scrollbar-track{background:#0f172a;}
+  ::-webkit-scrollbar-thumb{background:#6366f1;border-radius:2px;}
+  #modal{backdrop-filter:blur(8px);}
+  .modal-img{cursor:pointer;transition:transform 0.2s;}
+  .modal-img:hover{transform:scale(1.03);}
+</style>
+</head>
+<body class="min-h-screen grid-bg">
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="min-h-screen flex items-center justify-center px-4">
+  <div class="card rounded-3xl p-8 w-full max-w-sm fade-in">
+    <div class="text-center mb-6">
+      <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center mb-3" style="box-shadow:0 0 30px rgba(99,102,241,0.4)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <h1 class="font-orbitron font-black text-xl text-white neon-text">WAR ROOM</h1>
+      <p class="text-slate-500 text-xs mt-1">DriveAura — Administration</p>
+    </div>
+    <div class="space-y-3">
+      <input id="loginEmail" type="email" class="input-dark" placeholder="Email administrateur">
+      <input id="loginPassword" type="password" class="input-dark" placeholder="Mot de passe">
+      <input id="loginPath" type="text" class="input-dark" placeholder="Code d'accès secret">
+      <p id="loginError" class="text-red-400 text-xs text-center hidden">Accès refusé. Vérifiez vos identifiants.</p>
+      <button onclick="doLogin()" class="glow-btn w-full py-3 rounded-xl font-orbitron font-bold text-white text-sm tracking-wider mt-2">ACCÉDER →</button>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden min-h-screen">
+  <!-- TOP BAR -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-md border-b border-indigo-900/40 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="font-orbitron font-black text-sm text-white">DRIVE<span class="text-indigo-400">AURA</span></span>
+      <span class="text-slate-600 text-xs ml-1">WAR ROOM</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- WA Status -->
+      <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5">
+        <div class="wa-orb" id="waOrb"></div>
+        <span class="text-xs" id="waStatusText">Hinata Hors ligne</span>
+      </div>
+      <button onclick="doLogout()" class="text-slate-500 text-xs hover:text-red-400 transition-colors">Déconnexion</button>
+    </div>
+  </header>
+
+  <div class="pt-16 flex h-screen overflow-hidden">
+    <!-- SIDEBAR -->
+    <nav class="w-14 md:w-52 bg-black/60 border-r border-indigo-900/30 flex-shrink-0 flex flex-col pt-4 gap-1 px-2">
+      <button onclick="showTab('dossiers')" id="tabDossiers" class="tab-btn active flex items-center gap-3 px-3 py-2.5 rounded-xl border border-transparent text-left">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="text-sm hidden md:block">Dossiers</span>
+        <span id="badgeCount" class="ml-auto bg-indigo-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden md:flex">0</span>
+      </button>
+      <button onclick="showTab('payment')" id="tabPayment" class="tab-btn flex items-center gap-3 px-3 py-2.5 rounded-xl border border-transparent text-slate-400 text-left">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <span class="text-sm hidden md:block">Coordonnées paiement</span>
+      </button>
+      <button onclick="showTab('whatsapp')" id="tabWhatsapp" class="tab-btn flex items-center gap-3 px-3 py-2.5 rounded-xl border border-transparent text-slate-400 text-left">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="text-sm hidden md:block">Hinata WhatsApp</span>
+      </button>
+      <button onclick="showTab('prices')" id="tabPrices" class="tab-btn flex items-center gap-3 px-3 py-2.5 rounded-xl border border-transparent text-slate-400 text-left">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/><line x1="8" y1="6" x2="16" y2="6"/></svg>
+        <span class="text-sm hidden md:block">Tarifs</span>
+      </button>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 overflow-y-auto p-4">
+
+      <!-- ===== DOSSIERS TAB ===== -->
+      <div id="paneDossiers" class="fade-in">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-orbitron font-bold text-lg text-white">Dossiers clients</h2>
+          <button onclick="loadDossiers()" class="text-xs text-indigo-400 border border-indigo-800 rounded-lg px-3 py-1.5 hover:bg-indigo-900/30 transition-colors">↻ Actualiser</button>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex gap-2 mb-4 flex-wrap">
+          <button onclick="filterDossiers('all')" id="fAll" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white">Tous</button>
+          <button onclick="filterDossiers('en-attente')" id="fPending" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700">En attente</button>
+          <button onclick="filterDossiers('valide')" id="fValide" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700">Validés</button>
+          <button onclick="filterDossiers('rejete')" id="fRejete" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700">Refusés</button>
+        </div>
+
+        <div id="dossiersList" class="space-y-3">
+          <div class="text-center text-slate-600 py-12">Chargement...</div>
+        </div>
+      </div>
+
+      <!-- ===== PAIEMENT TAB ===== -->
+      <div id="panePayment" class="fade-in hidden">
+        <h2 class="font-orbitron font-bold text-lg text-white mb-4">Coordonnées de paiement</h2>
+        <div class="card rounded-2xl p-5 space-y-4 max-w-lg">
+          <div>
+            <label class="text-slate-400 text-xs block mb-1">Nom du bénéficiaire</label>
+            <input id="pBenef" type="text" class="input-dark" placeholder="DRIVEAURA SAS">
+          </div>
+          <div>
+            <label class="text-slate-400 text-xs block mb-1">IBAN</label>
+            <input id="pIban" type="text" class="input-dark" placeholder="FR76 0000...">
+          </div>
+          <div>
+            <label class="text-slate-400 text-xs block mb-1">BIC / SWIFT</label>
+            <input id="pBic" type="text" class="input-dark" placeholder="BNPAFRPPXXX">
+          </div>
+          <div>
+            <label class="text-slate-400 text-xs block mb-1">Lien PayPal</label>
+            <input id="pPaypal" type="text" class="input-dark" placeholder="https://paypal.me/...">
+          </div>
+          <p id="paymentSaved" class="text-green-400 text-xs hidden">✓ Sauvegardé et diffusé en temps réel aux clients connectés.</p>
+          <p id="paymentError" class="text-red-400 text-xs hidden">Erreur lors de la sauvegarde.</p>
+          <button onclick="savePaymentConfig()" class="glow-btn w-full py-3 rounded-xl font-bold text-white text-sm">💾 Sauvegarder et diffuser</button>
+        </div>
+      </div>
+
+      <!-- ===== WHATSAPP TAB ===== -->
+      <div id="paneWhatsapp" class="fade-in hidden">
+        <h2 class="font-orbitron font-bold text-lg text-white mb-4">Agent Hinata — WhatsApp</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="card rounded-2xl p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="wa-orb w-4 h-4" id="waOrb2"></div>
+              <span class="font-medium text-white" id="waStatusText2">Hinata Hors ligne</span>
+            </div>
+            <p class="text-slate-400 text-xs mb-4 leading-relaxed">Scannez ce QR code avec WhatsApp pour connecter l'agent Hinata. Allez dans <strong>WhatsApp → Appareils connectés → Connecter un appareil</strong>.</p>
+            <div id="qrContainer" class="bg-black rounded-xl p-3 flex items-center justify-center min-h-40">
+              <p class="text-slate-600 text-xs text-center">En attente du QR code...<br>Le QR apparaît automatiquement.</p>
+            </div>
+            <button onclick="reconnectWA()" class="w-full mt-3 py-2.5 rounded-xl border border-indigo-700 text-indigo-400 text-sm hover:bg-indigo-900/30 transition-colors">↻ Régénérer la connexion</button>
+          </div>
+          <div class="card rounded-2xl p-5">
+            <h3 class="text-white font-semibold mb-3 text-sm">À propos de Hinata</h3>
+            <div class="space-y-2 text-xs text-slate-400">
+              <div class="flex items-start gap-2"><span class="text-indigo-400">▸</span> Secrétaire de direction premium DriveAura</div>
+              <div class="flex items-start gap-2"><span class="text-indigo-400">▸</span> Répond sur WhatsApp 24h/24, 7j/7</div>
+              <div class="flex items-start gap-2"><span class="text-indigo-400">▸</span> Cascade IA : Groq → Gemini → OpenRouter</div>
+              <div class="flex items-start gap-2"><span class="text-indigo-400">▸</span> Mémoire persistante par client (MongoDB)</div>
+              <div class="flex items-start gap-2"><span class="text-indigo-400">▸</span> Simulation de frappe humaine</div>
+              <div class="flex items-start gap-2"><span class="text-indigo-400">▸</span> Anti-spam : 1 réponse par message</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== TARIFS TAB ===== -->
+      <div id="panePrices" class="fade-in hidden">
+        <h2 class="font-orbitron font-bold text-lg text-white mb-1">Tarifs des offres</h2>
+        <p class="text-slate-500 text-xs mb-4">Modifiez les prix ci-dessous. La mise à jour est instantanée — le site client et Hinata WhatsApp utilisent ces valeurs en temps réel.</p>
+        <div class="card rounded-2xl p-5 space-y-4 max-w-lg">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="text-slate-400 text-xs block mb-1 flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M5 17H3a2 2 0 01-2-2v-3a2 2 0 012-2h1l2-4h10l2 4h1a2 2 0 012 2v3a2 2 0 01-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>
+                Permis B — Manuel / Automatique (€)
+              </label>
+              <input id="pricePermisB" type="number" min="0" step="10" class="input-dark" placeholder="1250">
+            </div>
+            <div>
+              <label class="text-slate-400 text-xs block mb-1 flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6h-2l-3 6H5.5"/><path d="M15 6l3 3-2 2.5"/></svg>
+                Permis Moto — A / A2 (€)
+              </label>
+              <input id="pricePermisMoto" type="number" min="0" step="10" class="input-dark" placeholder="850">
+            </div>
+            <div>
+              <label class="text-slate-400 text-xs block mb-1 flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><rect x="1" y="3" width="14" height="13" rx="2"/><path d="M15 8h3.5l2.5 3v4h-6V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                Poids Lourd — C / CE + FIMO (€)
+              </label>
+              <input id="pricePoidsLourd" type="number" min="0" step="10" class="input-dark" placeholder="2400">
+            </div>
+            <div>
+              <label class="text-slate-400 text-xs block mb-1 flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><rect x="1" y="9" width="22" height="9" rx="2"/><path d="M5 9l2-4h10l2 4"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+                VTC / Taxi — Transport de personnes (€)
+              </label>
+              <input id="priceVtcTaxi" type="number" min="0" step="10" class="input-dark" placeholder="1800">
+            </div>
+          </div>
+          <div class="bg-indigo-900/20 border border-indigo-800/40 rounded-xl p-3 text-xs text-indigo-300 leading-relaxed">
+            Les nouveaux prix s'appliquent immédiatement au site client (SSE temps réel) et aux réponses WhatsApp de Hinata.
+          </div>
+          <p id="pricesSaved" class="text-green-400 text-xs hidden">Tarifs sauvegardés et diffusés en temps réel.</p>
+          <p id="pricesError" class="text-red-400 text-xs hidden">Erreur lors de la sauvegarde.</p>
+          <button onclick="savePricesConfig()" class="glow-btn w-full py-3 rounded-xl font-bold text-white text-sm">Enregistrer et diffuser les tarifs</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- DOSSIER MODAL -->
+<div id="modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-start justify-center p-4 overflow-y-auto pt-16">
+  <div class="card rounded-3xl w-full max-w-2xl fade-in" id="modalContent"></div>
+</div>
+
+<!-- IMAGE LIGHTBOX -->
+<div id="lightbox" class="fixed inset-0 bg-black/95 z-50 hidden flex items-center justify-center p-4" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" class="max-w-full max-h-full rounded-xl" style="max-height:90vh">
+</div>
+
+<script>
+let token = null;
+let allDossiers = [];
+let currentFilter = 'all';
+let sseSource = null;
+
+// ============ LOGIN ============
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  const secretPath = document.getElementById('loginPath').value.trim();
+  try {
+    const r = await fetch(`\${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, secretPath })
+    });
+    const data = await r.json();
+    if (data.token) {
+      token = data.token;
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      loadDossiers();
+      loadPaymentConfig();
+      setupSSE();
+    } else {
+      document.getElementById('loginError').classList.remove('hidden');
+    }
+  } catch (e) {
+    document.getElementById('loginError').classList.remove('hidden');
+  }
+}
+
+function doLogout() {
+  token = null;
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  if (sseSource) { sseSource.close(); sseSource = null; }
+}
+
+// Enter key login
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !token) doLogin(); });
+
+// ============ SSE ============
+function setupSSE() {
+  sseSource = new EventSource(`\${API_URL}/api/sse/events`);
+  sseSource.addEventListener('new-dossier', (e) => {
+    const d = JSON.parse(e.data);
+    showNotif(`📂 Nouveau dossier : ${d.prenom} ${d.nom}`);
+    loadDossiers();
+  });
+  sseSource.addEventListener('dossier-update', () => loadDossiers());
+  sseSource.addEventListener('whatsapp-qr', (e) => {
+    const { qr } = JSON.parse(e.data);
+    document.getElementById('qrContainer').innerHTML = `<img src="${qr}" class="w-full max-w-48 mx-auto rounded-lg">`;
+  });
+  sseSource.addEventListener('whatsapp-status', (e) => {
+    const { connected } = JSON.parse(e.data);
+    setWAStatus(connected);
+  });
+  sseSource.addEventListener('prices-update', (e) => {
+    const p = JSON.parse(e.data);
+    document.getElementById('pricePermisB').value = p.permisB || '';
+    document.getElementById('pricePermisMoto').value = p.permisMoto || '';
+    document.getElementById('pricePoidsLourd').value = p.poidsLourd || '';
+    document.getElementById('priceVtcTaxi').value = p.vtcTaxi || '';
+    showNotif('Tarifs mis à jour en temps réel');
+  });
+}
+
+// ============ TABS ============
+function showTab(name) {
+  ['Dossiers','Payment','Whatsapp','Prices'].forEach(t => {
+    document.getElementById('pane' + t).classList.add('hidden');
+    document.getElementById('tab' + t).classList.remove('active');
+    document.getElementById('tab' + t).classList.add('text-slate-400');
+  });
+  document.getElementById('pane' + name.charAt(0).toUpperCase() + name.slice(1)).classList.remove('hidden');
+  document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.remove('text-slate-400');
+  if (name === 'whatsapp') startWAPolling();
+  else stopWAPolling();
+  if (name === 'payment') loadPaymentConfig();
+  if (name === 'prices') loadPricesConfig();
+}
+
+// ============ DOSSIERS ============
+async function loadDossiers() {
+  try {
+    const r = await fetch(`\${API_URL}/api/dossiers`, { headers: { Authorization: 'Bearer ' + token } });
+    allDossiers = await r.json();
+    const pending = allDossiers.filter(d => d.statut === 'en-attente').length;
+    document.getElementById('badgeCount').textContent = pending;
+    renderDossiers();
+  } catch (e) {}
+}
+
+function filterDossiers(f) {
+  currentFilter = f;
+  ['fAll','fPending','fValide','fRejete'].forEach(id => {
+    document.getElementById(id).className = 'text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700';
+  });
+  const map = { all:'fAll','en-attente':'fPending',valide:'fValide',rejete:'fRejete' };
+  document.getElementById(map[f]).className = 'text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white';
+  renderDossiers();
+}
+
+function renderDossiers() {
+  const list = currentFilter === 'all' ? allDossiers : allDossiers.filter(d => d.statut === currentFilter);
+  const container = document.getElementById('dossiersList');
+  if (!list.length) {
+    container.innerHTML = '<div class="text-center text-slate-600 py-12 text-sm">Aucun dossier</div>';
+    return;
+  }
+  container.innerHTML = list.map(d => `
+    <div class="card rounded-xl p-4 dossier-row fade-in" onclick="openDossier('${d._id}')">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-indigo-900/50 border border-indigo-800 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            ${(d.prenom?.[0] || '?').toUpperCase()}${(d.nom?.[0] || '').toUpperCase()}
+          </div>
+          <div>
+            <p class="text-white text-sm font-semibold">${d.prenom} ${d.nom}</p>
+            <p class="text-slate-500 text-xs">${d.offreLabel || d.offre} — ${(d.prix||0).toLocaleString('fr-FR')} €</p>
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-1">
+          <span class="status-badge ${d.statut === 'en-attente' ? 'badge-pending' : d.statut === 'valide' ? 'badge-valide' : 'badge-rejete'}">
+            ${d.statut === 'en-attente' ? 'En attente' : d.statut === 'valide' ? 'Validé' : 'Refusé'}
+          </span>
+          <span class="text-slate-600 text-xs">${new Date(d.createdAt).toLocaleDateString('fr-FR')}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function openDossier(id) {
+  const dossier = allDossiers.find(d => d._id === id);
+  if (!dossier) return;
+  const modal = document.getElementById('modal');
+  const content = document.getElementById('modalContent');
+  content.innerHTML = `
+    <div class="p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-orbitron font-bold text-lg text-white">${dossier.prenom} ${dossier.nom}</h3>
+        <button onclick="closeModal()" class="text-slate-500 hover:text-white text-xl leading-none">×</button>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        ${[
+          ['Email', dossier.email],
+          ['Téléphone', '+33 ' + dossier.telephone],
+          ['Ville', dossier.ville],
+          ['Code Postal', dossier.codePostal],
+          ['Offre', dossier.offreLabel || dossier.offre],
+          ['Prix', (dossier.prix||0).toLocaleString('fr-FR') + ' €'],
+          ['Paiement', dossier.methodePaiement === 'sepa' ? 'Virement SEPA' : 'PayPal'],
+          ['Date', new Date(dossier.createdAt).toLocaleString('fr-FR')],
+        ].map(([k,v]) => `<div class="bg-slate-900/60 rounded-lg p-2.5"><p class="text-slate-500 text-xs">${k}</p><p class="text-white text-sm font-medium mt-0.5">${v||'—'}</p></div>`).join('')}
+      </div>
+      <p class="text-slate-400 text-xs mb-2 font-medium">Documents</p>
+      <div class="grid grid-cols-4 gap-2 mb-5">
+        ${[
+          { url: dossier.cniRecto, label: 'CNI Recto' },
+          { url: dossier.cniVerso, label: 'CNI Verso' },
+          { url: dossier.selfie, label: 'Selfie' },
+          { url: dossier.preuvePaiement, label: 'Preuve' },
+        ].map(p => p.url
+          ? `<div class="text-center"><img src="${p.url}" class="w-full h-20 object-cover rounded-lg border border-slate-700 modal-img" onclick="openLightbox('${p.url}')" /><p class="text-xs text-slate-500 mt-1">${p.label}</p></div>`
+          : `<div class="text-center"><div class="w-full h-20 bg-slate-800 rounded-lg flex items-center justify-center text-slate-600 text-xs">—</div><p class="text-xs text-slate-500 mt-1">${p.label}</p></div>`
+        ).join('')}
+      </div>
+      ${dossier.statut === 'en-attente' ? `
+        <div class="flex gap-3">
+          <button onclick="actionDossier('${dossier._id}','rejeter')" class="flex-1 py-3 rounded-xl border border-red-800 text-red-400 text-sm font-medium hover:bg-red-900/20 transition-colors">✗ Refuser</button>
+          <button onclick="actionDossier('${dossier._id}','valider')" class="flex-1 glow-btn py-3 rounded-xl font-bold text-white text-sm">✓ Valider</button>
+        </div>` : `
+        <div class="py-3 rounded-xl bg-slate-900 text-center text-slate-400 text-sm">
+          Statut : <span class="${dossier.statut === 'valide' ? 'text-green-400' : 'text-red-400'} font-bold">${dossier.statut === 'valide' ? 'Validé ✓' : 'Refusé ✗'}</span>
+        </div>`}
+    </div>`;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+async function actionDossier(id, action) {
+  try {
+    await fetch(`/api/dossiers/${id}/${action}`, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    closeModal();
+    loadDossiers();
+    showNotif(action === 'valider' ? '✅ Dossier validé !' : '✗ Dossier refusé');
+  } catch (e) {
+    alert('Erreur lors de l\'action');
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+  document.getElementById('modal').classList.remove('flex');
+}
+
+// ============ TARIFS ============
+async function loadPricesConfig() {
+  try {
+    const r = await fetch(`\${API_URL}/api/prices/config`, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await r.json();
+    document.getElementById('pricePermisB').value = data.permisB || 1250;
+    document.getElementById('pricePermisMoto').value = data.permisMoto || 850;
+    document.getElementById('pricePoidsLourd').value = data.poidsLourd || 2400;
+    document.getElementById('priceVtcTaxi').value = data.vtcTaxi || 1800;
+  } catch (e) {}
+}
+
+async function savePricesConfig() {
+  const err = document.getElementById('pricesError');
+  const ok = document.getElementById('pricesSaved');
+  err.classList.add('hidden'); ok.classList.add('hidden');
+  try {
+    const r = await fetch(`\${API_URL}/api/prices/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        permisB: Number(document.getElementById('pricePermisB').value),
+        permisMoto: Number(document.getElementById('pricePermisMoto').value),
+        poidsLourd: Number(document.getElementById('pricePoidsLourd').value),
+        vtcTaxi: Number(document.getElementById('priceVtcTaxi').value),
+      })
+    });
+    if (r.ok) { ok.classList.remove('hidden'); setTimeout(() => ok.classList.add('hidden'), 3000); }
+    else { err.classList.remove('hidden'); }
+  } catch (e) { err.classList.remove('hidden'); }
+}
+
+// ============ PAYMENT CONFIG ============
+async function loadPaymentConfig() {
+  try {
+    const r = await fetch(`\${API_URL}/api/payment/config`, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await r.json();
+    document.getElementById('pBenef').value = data.beneficiaire || '';
+    document.getElementById('pIban').value = data.iban || '';
+    document.getElementById('pBic').value = data.bic || '';
+    document.getElementById('pPaypal').value = data.paypalLink || '';
+  } catch (e) {}
+}
+
+async function savePaymentConfig() {
+  const err = document.getElementById('paymentError');
+  const ok = document.getElementById('paymentSaved');
+  err.classList.add('hidden'); ok.classList.add('hidden');
+  try {
+    const r = await fetch(`\${API_URL}/api/payment/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        beneficiaire: document.getElementById('pBenef').value,
+        iban: document.getElementById('pIban').value,
+        bic: document.getElementById('pBic').value,
+        paypalLink: document.getElementById('pPaypal').value,
+      })
+    });
+    if (r.ok) { ok.classList.remove('hidden'); setTimeout(() => ok.classList.add('hidden'), 3000); }
+    else { err.classList.remove('hidden'); }
+  } catch (e) { err.classList.remove('hidden'); }
+}
+
+// ============ WHATSAPP ============
+let waPollingInterval = null;
+
+async function checkWAStatus() {
+  if (!token) return;
+  try {
+    const r = await fetch(`\${API_URL}/api/whatsapp/status`, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await r.json();
+    setWAStatus(data.connected);
+    if (data.connected) {
+      document.getElementById('qrContainer').innerHTML = `
+        <div class="flex flex-col items-center gap-3 py-4">
+          <div class="w-16 h-16 rounded-full bg-green-900/30 border border-green-700 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          </div>
+          <p class="text-green-400 text-sm font-medium">Hinata est connectée</p>
+          <p class="text-slate-500 text-xs text-center">L'agent répond automatiquement<br>aux messages WhatsApp</p>
+        </div>`;
+      stopWAPolling();
+    } else if (data.qr) {
+      document.getElementById('qrContainer').innerHTML = `
+        <div class="flex flex-col items-center gap-2">
+          <img src="${data.qr}" class="w-full max-w-52 mx-auto rounded-xl border border-slate-700">
+          <p class="text-slate-500 text-xs">Scannez avec WhatsApp → Appareils connectés</p>
+        </div>`;
+    } else {
+      // QR not yet generated — show spinner, Baileys is initializing
+      const container = document.getElementById('qrContainer');
+      if (!container.querySelector('img') && !container.querySelector('.wa-spinner')) {
+        container.innerHTML = `
+          <div class="wa-spinner flex flex-col items-center gap-3 py-6">
+            <div style="width:32px;height:32px;border:2px solid rgba(99,102,241,.3);border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite"></div>
+            <p class="text-slate-500 text-xs text-center">Initialisation de l'agent…<br>Le QR apparaît dans quelques secondes.</p>
+          </div>`;
+      }
+    }
+  } catch (e) {}
+}
+
+function startWAPolling() {
+  checkWAStatus();
+  stopWAPolling();
+  waPollingInterval = setInterval(checkWAStatus, 3000);
+}
+
+function stopWAPolling() {
+  if (waPollingInterval) { clearInterval(waPollingInterval); waPollingInterval = null; }
+}
+
+async function reconnectWA() {
+  document.getElementById('qrContainer').innerHTML = `
+    <div class="flex flex-col items-center gap-3 py-6">
+      <div style="width:32px;height:32px;border:2px solid rgba(99,102,241,.3);border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite"></div>
+      <p class="text-slate-500 text-xs text-center">Reconnexion en cours…</p>
+    </div>`;
+  try {
+    await fetch(`\${API_URL}/api/whatsapp/reconnect`, { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+    startWAPolling();
+  } catch (e) {}
+}
+
+function setWAStatus(connected) {
+  ['waOrb','waOrb2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.className = 'wa-orb' + (connected ? ' connected' : '') + (id === 'waOrb2' ? ' w-4 h-4' : ''); }
+  });
+  ['waStatusText','waStatusText2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = connected ? '✦ Hinata Connectée' : 'Hinata Hors ligne'; el.className = connected ? 'text-green-400 text-xs font-medium' : 'text-xs'; }
+  });
+}
+
+// ============ LIGHTBOX ============
+function openLightbox(url) {
+  document.getElementById('lightboxImg').src = url;
+  document.getElementById('lightbox').classList.remove('hidden');
+  event.stopPropagation();
+}
+function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
+
+// ============ NOTIF ============
+function showNotif(msg) {
+  const n = document.createElement('div');
+  n.className = 'fixed bottom-4 right-4 z-50 bg-indigo-700 text-white text-sm px-4 py-3 rounded-xl shadow-lg fade-in';
+  n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 4000);
+}
+
+// Close modal on backdrop click
+document.getElementById('modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+</script>
+</body>
+</html>
