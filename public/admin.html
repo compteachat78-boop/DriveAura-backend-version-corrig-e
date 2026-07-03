@@ -99,6 +99,10 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/><line x1="8" y1="6" x2="16" y2="6"/></svg>
         <span class="text-sm hidden md:block">Tarifs</span>
       </button>
+      <button onclick="showTab('conversations')" id="tabConversations" class="tab-btn flex items-center gap-3 px-3 py-2.5 rounded-xl border border-transparent text-slate-400 text-left">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        <span class="text-sm hidden md:block">Conversations</span>
+      </button>
     </nav>
 
     <!-- MAIN CONTENT -->
@@ -223,6 +227,26 @@
         </div>
       </div>
 
+      <!-- ===== CONVERSATIONS TAB ===== -->
+      <div id="paneConversations" class="fade-in hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-orbitron font-bold text-lg text-white">Conversations WhatsApp — Hinata</h2>
+          <button onclick="loadConversations()" class="text-xs text-indigo-400 border border-indigo-800 rounded-lg px-3 py-1.5 hover:bg-indigo-900/30 transition-colors">↻ Actualiser</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" style="height:calc(100vh - 180px)">
+          <div class="card rounded-2xl p-3 overflow-y-auto">
+            <div id="conversationsList" class="space-y-2">
+              <div class="text-center text-slate-600 py-12">Chargement...</div>
+            </div>
+          </div>
+          <div class="card rounded-2xl p-4 overflow-y-auto">
+            <div id="conversationThread" class="space-y-2">
+              <div class="text-center text-slate-600 py-12 text-sm">Sélectionne une conversation à gauche pour lire les échanges.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 </div>
@@ -242,6 +266,7 @@ let token = null;
 let allDossiers = [];
 let currentFilter = 'all';
 let sseSource = null;
+let currentConversationId = null;
 
 // ============ LOGIN ============
 async function doLogin() {
@@ -305,11 +330,18 @@ function setupSSE() {
     document.getElementById('priceVtcTaxi').value = p.vtcTaxi || '';
     showNotif('Tarifs mis à jour en temps réel');
   });
+  sseSource.addEventListener('wa-conversation-update', (e) => {
+    const data = JSON.parse(e.data);
+    if (document.getElementById('paneConversations') && !document.getElementById('paneConversations').classList.contains('hidden')) {
+      loadConversations();
+      if (currentConversationId === data.id) loadConversationThread(data.id);
+    }
+  });
 }
 
 // ============ TABS ============
 function showTab(name) {
-  ['Dossiers','Payment','Whatsapp','Prices'].forEach(t => {
+  ['Dossiers','Payment','Whatsapp','Prices','Conversations'].forEach(t => {
     document.getElementById('pane' + t).classList.add('hidden');
     document.getElementById('tab' + t).classList.remove('active');
     document.getElementById('tab' + t).classList.add('text-slate-400');
@@ -321,6 +353,7 @@ function showTab(name) {
   else stopWAPolling();
   if (name === 'payment') loadPaymentConfig();
   if (name === 'prices') loadPricesConfig();
+  if (name === 'conversations') loadConversations();
 }
 
 // ============ DOSSIERS ============
@@ -471,6 +504,65 @@ async function savePricesConfig() {
     if (r.ok) { ok.classList.remove('hidden'); setTimeout(() => ok.classList.add('hidden'), 3000); }
     else { err.classList.remove('hidden'); }
   } catch (e) { err.classList.remove('hidden'); }
+}
+
+// ============ CONVERSATIONS WHATSAPP ============
+async function loadConversations() {
+  const container = document.getElementById('conversationsList');
+  try {
+    const r = await fetch(`${API_URL}/api/whatsapp/conversations`, { headers: { Authorization: 'Bearer ' + token } });
+    const list = await r.json();
+    if (!Array.isArray(list) || list.length === 0) {
+      container.innerHTML = '<div class="text-center text-slate-600 py-12 text-sm">Aucune conversation pour le moment.</div>';
+      return;
+    }
+    container.innerHTML = list.map(c => `
+      <div onclick="loadConversationThread('${c.id}')" class="p-3 rounded-xl cursor-pointer border ${currentConversationId === c.id ? 'border-indigo-600 bg-indigo-900/20' : 'border-slate-800 hover:bg-slate-800/50'} transition-colors">
+        <div class="flex items-center justify-between">
+          <span class="text-white text-sm font-medium">+${escapeHtml(c.phone)}</span>
+          <span class="text-slate-600 text-[10px]">${new Date(c.updatedAt).toLocaleString('fr-FR')}</span>
+        </div>
+        <p class="text-slate-500 text-xs mt-1 truncate">${escapeHtml(c.lastMessage || '')}</p>
+        <p class="text-slate-700 text-[10px] mt-1">${c.messageCount} message${c.messageCount > 1 ? 's' : ''}</p>
+      </div>
+    `).join('');
+  } catch (e) {
+    container.innerHTML = '<div class="text-center text-red-400 py-12 text-sm">Erreur de chargement.</div>';
+  }
+}
+
+async function loadConversationThread(id) {
+  currentConversationId = id;
+  loadConversations();
+  const container = document.getElementById('conversationThread');
+  container.innerHTML = '<div class="text-center text-slate-600 py-12 text-sm">Chargement...</div>';
+  try {
+    const r = await fetch(`${API_URL}/api/whatsapp/conversations/${id}`, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await r.json();
+    if (!data.messages || data.messages.length === 0) {
+      container.innerHTML = '<div class="text-center text-slate-600 py-12 text-sm">Aucun message.</div>';
+      return;
+    }
+    container.innerHTML = `
+      <p class="text-slate-400 text-xs mb-3 pb-2 border-b border-slate-800">Conversation avec <strong class="text-white">+${escapeHtml(data.phone)}</strong></p>
+      ${data.messages.map(m => `
+        <div class="flex ${m.role === 'assistant' ? 'justify-end' : 'justify-start'}">
+          <div class="max-w-[80%] rounded-xl px-3 py-2 text-xs ${m.role === 'assistant' ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-200'}">
+            ${escapeHtml(m.content)}
+          </div>
+        </div>
+      `).join('')}
+    `;
+    container.scrollTop = container.scrollHeight;
+  } catch (e) {
+    container.innerHTML = '<div class="text-center text-red-400 py-12 text-sm">Erreur de chargement.</div>';
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
 }
 
 // ============ PAYMENT CONFIG ============
