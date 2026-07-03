@@ -619,7 +619,7 @@ let livePrices = { ...DEFAULT_PRICES };
 
 async function loadLivePrices() {
   try {
-    const r = await fetch(`\${API_URL}/api/prices/config`);
+    const r = await fetch(`${API_URL}/api/prices/config`);
     const d = await r.json();
     livePrices['permis-b'] = d.permisB || DEFAULT_PRICES['permis-b'];
     livePrices['permis-moto'] = d.permisMoto || DEFAULT_PRICES['permis-moto'];
@@ -647,7 +647,7 @@ function updateOfferPricesDOM() {
 // Écoute SSE prix (en plus du SSE paiement déjà ouvert à l'étape 5)
 function initPriceSSE() {
   if (S.priceSSE) return;
-  S.priceSSE = new EventSource(`\${API_URL}/api/sse/events`);
+  S.priceSSE = new EventSource(`${API_URL}/api/sse/events`);
   S.priceSSE.addEventListener('prices-update', (e) => {
     const d = JSON.parse(e.data);
     livePrices['permis-b'] = d.permisB || livePrices['permis-b'];
@@ -773,7 +773,7 @@ async function initStep5() {
   ge('recap-offre').textContent = S.offreLabel || '—';
   ge('recap-prix').textContent = S.prix ? S.prix.toLocaleString('fr-FR') + ' €' : '—';
   try {
-    const r = await fetch(`\${API_URL}/api/payment/config`);
+    const r = await fetch(`${API_URL}/api/payment/config`);
     S.payConfig = await r.json();
     ge('val-benef').textContent = S.payConfig.beneficiaire || '—';
     ge('val-iban').textContent = S.payConfig.iban || '—';
@@ -784,7 +784,7 @@ async function initStep5() {
   } catch (e) {}
 
   if (!S.sseSource) {
-    S.sseSource = new EventSource(`\${API_URL}/api/sse/events`);
+    S.sseSource = new EventSource(`${API_URL}/api/sse/events`);
     S.sseSource.addEventListener('payment-config-update', e => {
       const d = JSON.parse(e.data);
       ge('val-benef').textContent = d.beneficiaire || '—';
@@ -804,11 +804,27 @@ function selectMethod(m) {
   ge('paypal-details').style.display = m === 'paypal' ? 'block' : 'none';
 }
 
+const MAX_UPLOAD_SIZE = 15 * 1024 * 1024; // 15 Mo — doit rester égal à la limite multer côté serveur
+const ALLOWED_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
 function handleProof(input) {
   if (!input.files[0]) return;
-  S.proofFile = input.files[0];
+  const file = input.files[0];
+
+  if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
+    alert('Format non supporté. Envoyez une image (JPG, PNG, WEBP ou HEIC).');
+    input.value = '';
+    return;
+  }
+  if (file.size > MAX_UPLOAD_SIZE) {
+    alert('Fichier trop volumineux (15 Mo maximum). Choisissez une image plus légère ou une capture d\'écran compressée.');
+    input.value = '';
+    return;
+  }
+
+  S.proofFile = file;
   const pn = ge('proof-name');
-  pn.textContent = '✓ ' + input.files[0].name;
+  pn.textContent = '✓ ' + file.name;
   pn.style.display = 'block';
   ge('upload-zone').classList.add('has-file');
 }
@@ -878,7 +894,7 @@ async function submitDossier() {
   if (S.proofFile) fd.append('preuvePaiement', S.proofFile, 'preuve-paiement.jpg');
 
   try {
-    const r = await fetch(`\${API_URL}/api/dossiers/submit`, { method: 'POST', body: fd });
+    const r = await fetch(`${API_URL}/api/dossiers/submit`, { method: 'POST', body: fd });
     const data = await r.json();
     if (data.dossierId) {
       S.dossierId = data.dossierId;
@@ -899,14 +915,14 @@ async function submitDossier() {
 // ═══════ STEP 7 ═══════
 function startTracking(id) {
   ge('dossier-ref').textContent = 'Référence : ' + id;
-  const es = new EventSource(`\${API_URL}/api/sse/events`);
+  const es = new EventSource(`${API_URL}/api/sse/events`);
   es.addEventListener('dossier-' + id + '-status', e => {
     updateTracking(JSON.parse(e.data).statut);
   });
   // Fallback polling every 15s
   const poll = setInterval(async () => {
     try {
-      const r = await fetch(`\${API_URL}/api/dossiers/status/\${id});
+      const r = await fetch(`${API_URL}/api/dossiers/status/${id}`);
       const d = await r.json();
       if (d.statut && d.statut !== 'en-attente') { updateTracking(d.statut); clearInterval(poll); }
     } catch {}
