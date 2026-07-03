@@ -95,6 +95,9 @@ const ConversationSchema = new mongoose.Schema(
   {
     jid: { type: String, unique: true, required: true },
     messages: [{ role: String, content: String }],
+    dailyCount: { type: Number, default: 0 },
+    dailyResetAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
+    limitReached: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -186,26 +189,74 @@ function loginRateLimit(req, res, next) {
 // ─────────────────────────────────────────
 //  LLM — CASCADE GROQ → GEMINI → OPENROUTER
 // ─────────────────────────────────────────
-const SYSTEM_PROMPT = `Tu es Hinata, secrétaire de direction de DriveAura. Tu réponds sur WhatsApp.
+const DEFAULT_PRICES = { permisB: 1250, permisMoto: 850, poidsLourd: 2400, vtcTaxi: 1800 };
+
+// ✅ CORRECTION : le prompt est maintenant généré dynamiquement à partir des
+// tarifs stockés en base (PricesConfig) au lieu d'être écrit en dur, pour que
+// les modifications faites depuis le dashboard admin soient reflétées
+// immédiatement dans les réponses de Hinata.
+function buildSystemPrompt(prices, dossierContext) {
+  const p = { ...DEFAULT_PRICES, ...(prices || {}) };
+  return `Tu es Hinata, secrétaire de direction de DriveAura. Tu réponds sur WhatsApp.
 
 RÈGLE N°1 ABSOLUE : Ta réponse fait 1 ou 2 phrases MAXIMUM. Jamais plus. Jamais de listes. Jamais de tirets.
 RÈGLE N°2 : Tu écris comme un humain qui tape vite sur son téléphone. Naturel, direct, pas de formules robot.
 RÈGLE N°3 : Tu ne prononces jamais les noms des patrons. Tu dis "La Direction" uniquement.
 RÈGLE N°4 : Tu ne donnes jamais notre adresse. Tu renvoies vers autoecole-driveaura.fun.
 RÈGLE N°5 : SIREN 102 554 995 — seulement si le client demande explicitement des preuves de sérieux.
+RÈGLE N°6 : Ne dis jamais explicitement que tu consultes "une base de données" ou "le système" — parle comme si tu le savais naturellement.
 
 Ce que tu sais :
-- Permis B (Manuel/Auto) : 1 250€ | Moto A/A2 : 850€ | Poids Lourd C/CE+FIMO : 2 400€ | VTC/Taxi : 1 800€
+- Permis B (Manuel/Auto) : ${p.permisB}€ | Moto A/A2 : ${p.permisMoto}€ | Poids Lourd C/CE+FIMO : ${p.poidsLourd}€ | VTC/Taxi : ${p.vtcTaxi}€
 - Délai garanti : 7 jours ouvrés
 - Paiement : Virement SEPA ou PayPal uniquement (pas de CB — traitement prioritaire)
 - Inscription : autoecole-driveaura.fun
 
 Exemples de bonnes réponses :
-- "Permis B c'est 1 250€, garanti en 7 jours. Tu veux t'inscrire ?"
+- "Permis B c'est ${p.permisB}€, garanti en 7 jours. Tu veux t'inscrire ?"
 - "On accepte virement SEPA ou PayPal, c'est pour garantir ton délai de 7 jours."
-- "Inscris-toi sur autoecole-driveaura.fun, la Direction s'occupe du reste."`;
+- "Inscris-toi sur autoecole-driveaura.fun, la Direction s'occupe du reste."
 
-async function generateResponse(messages, newMessage) {
+Information réelle sur ce client (à utiliser uniquement s'il parle de son dossier/inscription) :
+${dossierContext}`;
+}
+
+// ✅ CORRECTION : Hinata peut désormais répondre avec le vrai statut du dossier
+// du client (retrouvé via son numéro WhatsApp) au lieu d'improviser.
+function normalizePhoneDigits(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  return digits.slice(-9);
+}
+
+async function findDossierByJid(jid) {
+  try {
+    const targetDigits = normalizePhoneDigits(jid);
+    if (!targetDigits) return null;
+    const dossiers = await Dossier.find()
+      .select("telephone statut offreLabel prenom nom createdAt")
+      .sort({ createdAt: -1 })
+      .limit(2000)
+      .lean();
+    return dossiers.find((d) => normalizePhoneDigits(d.telephone) === targetDigits) || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildDossierContext(dossier) {
+  if (!dossier) {
+    return "Ce numéro n'a pas encore de dossier enregistré chez nous.";
+  }
+  const statutLabel = {
+    "en-attente": "en cours de traitement par la Direction",
+    valide: "validé",
+    rejete: "refusé, il doit corriger et le renvoyer",
+  }[dossier.statut] || dossier.statut;
+  return `${dossier.prenom || "Ce client"} a un dossier "${dossier.offreLabel || "en cours"}" avec le statut réel : ${statutLabel}.`;
+}
+
+async function generateResponse(messages, newMessage, systemPrompt) {
+  const prompt = systemPrompt || buildSystemPrompt(DEFAULT_PRICES, "Aucune information de dossier disponible.");
   const history = [
     ...messages.slice(-16).map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: newMessage },
@@ -216,7 +267,7 @@ async function generateResponse(messages, newMessage) {
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const r = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
+      messages: [{ role: "system", content: prompt }, ...history],
       max_tokens: 120, temperature: 0.6,
     });
     const c = r.choices[0]?.message?.content;
@@ -226,7 +277,7 @@ async function generateResponse(messages, newMessage) {
   // 2. Gemini
   try {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY ?? "");
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: SYSTEM_PROMPT });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: prompt });
     const chat = model.startChat({
       history: history.slice(0, -1).map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -243,7 +294,7 @@ async function generateResponse(messages, newMessage) {
     const or = new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY });
     const r = await or.chat.completions.create({
       model: "mistralai/mistral-7b-instruct",
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
+      messages: [{ role: "system", content: prompt }, ...history],
       max_tokens: 120,
     });
     const t = r.choices[0]?.message?.content;
@@ -335,13 +386,47 @@ async function initWhatsApp() {
   }
 }
 
+// ✅ CORRECTION : vraie limite anti-spam par volume (pas seulement un
+// anti-doublon de 3s). Chaque contact a un quota de messages/jour ; au-delà,
+// Hinata prévient une seule fois puis se tait jusqu'au lendemain.
+const MAX_MESSAGES_PER_DAY = Number(process.env.MAX_MESSAGES_PER_DAY) || 20;
+
 async function handleWAMessage(jid, text) {
   if (!sock) return;
   try {
     let conv = await Conversation.findOne({ jid });
     if (!conv) conv = new Conversation({ jid, messages: [] });
 
-    const reply = await generateResponse(conv.messages, text);
+    const now = new Date();
+    if (!conv.dailyResetAt || now > conv.dailyResetAt) {
+      conv.dailyCount = 0;
+      conv.dailyResetAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      conv.limitReached = false;
+    }
+    conv.dailyCount = (conv.dailyCount || 0) + 1;
+
+    if (conv.dailyCount > MAX_MESSAGES_PER_DAY) {
+      const alreadyNotified = conv.limitReached;
+      conv.limitReached = true;
+      await conv.save();
+      if (!alreadyNotified) {
+        const delay = Math.floor(Math.random() * 5000) + 5000;
+        await sock.sendPresenceUpdate("composing", jid);
+        await new Promise((r) => setTimeout(r, delay));
+        await sock.sendPresenceUpdate("paused", jid);
+        await sock.sendMessage(jid, { text: "Je transmets tout ça à la Direction, on te recontacte rapidement 🙏" });
+      }
+      console.log(`[Hinata] Quota atteint pour ${jid.slice(0, 8)}…, message ignoré`);
+      return;
+    }
+
+    const [pricesConfig, dossier] = await Promise.all([
+      PricesConfig.findOne({ key: "main" }).lean(),
+      findDossierByJid(jid),
+    ]);
+    const systemPrompt = buildSystemPrompt(pricesConfig, buildDossierContext(dossier));
+
+    const reply = await generateResponse(conv.messages, text, systemPrompt);
 
     const delay = Math.floor(Math.random() * 10000) + 20000;
     await sock.sendPresenceUpdate("composing", jid);
@@ -354,6 +439,8 @@ async function handleWAMessage(jid, text) {
     conv.messages.push({ role: "assistant", content: reply });
     if (conv.messages.length > 40) conv.messages.splice(0, conv.messages.length - 40);
     await conv.save();
+
+    broadcastSSE("wa-conversation-update", { id: String(conv._id), phone: jid.split("@")[0], lastMessage: reply });
 
     console.log(`[Hinata] Répondu à ${jid.slice(0, 8)}… (${reply.length} chars)`);
   } catch (err) {
@@ -576,6 +663,32 @@ app.post("/api/whatsapp/reconnect", requireAdmin, async (_req, res) => {
   try {
     await initWhatsApp();
     res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── WHATSAPP — DASHBOARD DES CONVERSATIONS ── ✅ NOUVEAU ──
+app.get("/api/whatsapp/conversations", requireAdmin, async (_req, res) => {
+  try {
+    const convs = await Conversation.find()
+      .sort({ updatedAt: -1 })
+      .select("jid messages updatedAt dailyCount")
+      .lean();
+    const list = convs.map((c) => ({
+      id: c._id,
+      phone: c.jid.split("@")[0],
+      lastMessage: c.messages?.[c.messages.length - 1]?.content || "",
+      messageCount: c.messages?.length || 0,
+      updatedAt: c.updatedAt,
+    }));
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get("/api/whatsapp/conversations/:id", requireAdmin, async (req, res) => {
+  try {
+    const conv = await Conversation.findById(req.params.id).lean();
+    if (!conv) { res.status(404).json({ error: "Introuvable" }); return; }
+    res.json({ id: conv._id, phone: conv.jid.split("@")[0], messages: conv.messages, updatedAt: conv.updatedAt });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
