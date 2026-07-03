@@ -249,7 +249,7 @@ async function doLogin() {
   const password = document.getElementById('loginPassword').value.trim();
   const secretPath = document.getElementById('loginPath').value.trim();
   try {
-    const r = await fetch(`\${API_URL}/api/auth/login`, {
+    const r = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, secretPath })
@@ -282,7 +282,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !token) d
 
 // ============ SSE ============
 function setupSSE() {
-  sseSource = new EventSource(`\${API_URL}/api/sse/events`);
+  sseSource = new EventSource(`${API_URL}/api/sse/events`);
   sseSource.addEventListener('new-dossier', (e) => {
     const d = JSON.parse(e.data);
     showNotif(`📂 Nouveau dossier : ${d.prenom} ${d.nom}`);
@@ -326,7 +326,7 @@ function showTab(name) {
 // ============ DOSSIERS ============
 async function loadDossiers() {
   try {
-    const r = await fetch(`\${API_URL}/api/dossiers`, { headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch(`${API_URL}/api/dossiers`, { headers: { Authorization: 'Bearer ' + token } });
     allDossiers = await r.json();
     const pending = allDossiers.filter(d => d.statut === 'en-attente').length;
     document.getElementById('badgeCount').textContent = pending;
@@ -424,7 +424,7 @@ async function openDossier(id) {
 
 async function actionDossier(id, action) {
   try {
-    await fetch(`/api/dossiers/${id}/${action}`, {
+    await fetch(`${API_URL}/api/dossiers/${id}/${action}`, {
       method: 'PATCH',
       headers: { Authorization: 'Bearer ' + token }
     });
@@ -444,7 +444,7 @@ function closeModal() {
 // ============ TARIFS ============
 async function loadPricesConfig() {
   try {
-    const r = await fetch(`\${API_URL}/api/prices/config`, { headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch(`${API_URL}/api/prices/config`, { headers: { Authorization: 'Bearer ' + token } });
     const data = await r.json();
     document.getElementById('pricePermisB').value = data.permisB || 1250;
     document.getElementById('pricePermisMoto').value = data.permisMoto || 850;
@@ -458,7 +458,7 @@ async function savePricesConfig() {
   const ok = document.getElementById('pricesSaved');
   err.classList.add('hidden'); ok.classList.add('hidden');
   try {
-    const r = await fetch(`\${API_URL}/api/prices/config`, {
+    const r = await fetch(`${API_URL}/api/prices/config`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({
@@ -476,7 +476,7 @@ async function savePricesConfig() {
 // ============ PAYMENT CONFIG ============
 async function loadPaymentConfig() {
   try {
-    const r = await fetch(`\${API_URL}/api/payment/config`, { headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch(`${API_URL}/api/payment/config`, { headers: { Authorization: 'Bearer ' + token } });
     const data = await r.json();
     document.getElementById('pBenef').value = data.beneficiaire || '';
     document.getElementById('pIban').value = data.iban || '';
@@ -490,7 +490,7 @@ async function savePaymentConfig() {
   const ok = document.getElementById('paymentSaved');
   err.classList.add('hidden'); ok.classList.add('hidden');
   try {
-    const r = await fetch(`\${API_URL}/api/payment/config`, {
+    const r = await fetch(`${API_URL}/api/payment/config`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({
@@ -511,7 +511,7 @@ let waPollingInterval = null;
 async function checkWAStatus() {
   if (!token) return;
   try {
-    const r = await fetch(`\${API_URL}/api/whatsapp/status`, { headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch(`${API_URL}/api/whatsapp/status`, { headers: { Authorization: 'Bearer ' + token } });
     const data = await r.json();
     setWAStatus(data.connected);
     if (data.connected) {
@@ -561,7 +561,7 @@ async function reconnectWA() {
       <p class="text-slate-500 text-xs text-center">Reconnexion en cours…</p>
     </div>`;
   try {
-    await fetch(`\${API_URL}/api/whatsapp/reconnect`, { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+    await fetch(`${API_URL}/api/whatsapp/reconnect`, { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
     startWAPolling();
   } catch (e) {}
 }
