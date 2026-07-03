@@ -584,7 +584,7 @@ app.get(`/${ADMIN_SECRET_PATH}`, (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
-app.get("*", (req, res, next) => {
+app.get("/*splat", (req, res, next) => {
   if (req.path.startsWith("/api/")) return next();
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
