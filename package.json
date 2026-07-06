@@ -14,7 +14,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.7.18",
+    "@whiskeysockets/baileys": "^6.17.16",
     "cloudinary": "^2.6.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
