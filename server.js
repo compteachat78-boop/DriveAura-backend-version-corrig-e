@@ -22,7 +22,7 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-} = baileysPkg.default ?? baileysPkg;
+} = baileysPkg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -105,10 +105,23 @@ const ConversationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// ✅ NOUVEAU : session WhatsApp (Baileys) persistée dans MongoDB au lieu du
+// disque local — Render (plan gratuit) n'a pas de disque persistant, donc
+// tout fichier écrit dans .baileys-auth/ est effacé à chaque redémarrage.
+// On sauvegarde ici le contenu de ce dossier pour survivre aux redéploiements.
+const WhatsAppAuthSchema = new mongoose.Schema(
+  {
+    _id: { type: String, default: "session" },
+    files: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  { timestamps: true }
+);
+
 const Dossier = mongoose.model("Dossier", DossierSchema);
 const PaymentConfig = mongoose.model("PaymentConfig", PaymentConfigSchema);
 const PricesConfig = mongoose.model("PricesConfig", PricesConfigSchema);
 const Conversation = mongoose.model("Conversation", ConversationSchema);
+const WhatsAppAuth = mongoose.model("WhatsAppAuth", WhatsAppAuthSchema);
 
 async function connectMongo() {
   await mongoose.connect(process.env.MONGODB_URI);
@@ -320,9 +333,60 @@ function getWhatsAppStatus() {
   return { connected: isConnected, qr: currentQR };
 }
 
+// ✅ NOUVEAU : persistance de la session WhatsApp dans MongoDB.
+// Render (plan gratuit) n'a pas de disque persistant : le dossier
+// .baileys-auth/ est recréé vide à chaque redémarrage/redéploiement.
+// On restaure son contenu depuis MongoDB au démarrage, et on resynchronise
+// vers MongoDB dès que les fichiers d'auth changent (creds ou clés).
+let authSyncTimer = null;
+
+async function restoreAuthDirFromMongo() {
+  try {
+    const doc = await WhatsAppAuth.findById("session").lean();
+    fs.mkdirSync(AUTH_DIR, { recursive: true });
+    if (doc && doc.files && Object.keys(doc.files).length > 0) {
+      for (const [name, content] of Object.entries(doc.files)) {
+        fs.writeFileSync(path.join(AUTH_DIR, name), content, "utf8");
+      }
+      console.log(`[WhatsApp] Session restaurée depuis MongoDB (${Object.keys(doc.files).length} fichiers)`);
+    }
+  } catch (e) {
+    console.error("[WhatsApp] Restauration session Mongo échouée:", e.message);
+  }
+}
+
+async function syncAuthDirToMongo() {
+  try {
+    if (!fs.existsSync(AUTH_DIR)) return;
+    const filenames = fs.readdirSync(AUTH_DIR);
+    const files = {};
+    for (const name of filenames) {
+      files[name] = fs.readFileSync(path.join(AUTH_DIR, name), "utf8");
+    }
+    await WhatsAppAuth.findByIdAndUpdate(
+      "session",
+      { files },
+      { upsert: true }
+    );
+  } catch (e) {
+    console.error("[WhatsApp] Sauvegarde session Mongo échouée:", e.message);
+  }
+}
+
+function scheduleAuthSync() {
+  if (authSyncTimer) clearTimeout(authSyncTimer);
+  authSyncTimer = setTimeout(() => { syncAuthDirToMongo(); }, 3000);
+}
+
+async function clearAuthInMongo() {
+  try { await WhatsAppAuth.findByIdAndUpdate("session", { files: {} }, { upsert: true }); }
+  catch (e) { console.error("[WhatsApp] Effacement session Mongo échoué:", e.message); }
+}
+
 async function initWhatsApp() {
   if (sock) { try { sock.end(undefined); } catch {} sock = null; }
   try {
+    await restoreAuthDirFromMongo();
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
     const { version } = await fetchLatestBaileysVersion();
 
@@ -334,7 +398,19 @@ async function initWhatsApp() {
       markOnlineOnConnect: false,
     });
 
-    sock.ev.on("creds.update", saveCreds);
+    // Sauvegarde des credentials (identité liée) à chaque mise à jour…
+    sock.ev.on("creds.update", async () => {
+      await saveCreds();
+      scheduleAuthSync();
+    });
+
+    // …et des clés de chiffrement de session (prekeys, sender-keys, etc.),
+    // qui sont écrites directement sur disque sans passer par creds.update.
+    const originalKeysSet = state.keys.set.bind(state.keys);
+    state.keys.set = async (data) => {
+      await originalKeysSet(data);
+      scheduleAuthSync();
+    };
 
     sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
@@ -685,6 +761,7 @@ app.post("/api/whatsapp/logout", requireAdmin, async (_req, res) => {
     if (fs.existsSync(AUTH_DIR)) {
       fs.rmSync(AUTH_DIR, { recursive: true, force: true });
     }
+    await clearAuthInMongo();
     await initWhatsApp();
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
