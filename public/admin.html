@@ -168,6 +168,8 @@
               <p class="text-slate-600 text-xs text-center">En attente du QR code...<br>Le QR apparaît automatiquement.</p>
             </div>
             <button onclick="reconnectWA()" class="w-full mt-3 py-2.5 rounded-xl border border-indigo-700 text-indigo-400 text-sm hover:bg-indigo-900/30 transition-colors">↻ Régénérer la connexion</button>
+            <button onclick="logoutWA()" class="w-full mt-2 py-2.5 rounded-xl border border-red-800 text-red-400 text-sm hover:bg-red-900/20 transition-colors">⏻ Déconnecter et oublier cet appareil</button>
+            <p class="text-slate-600 text-[11px] mt-2 leading-relaxed">Utilise ce bouton si WhatsApp affiche "Impossible de connecter l'appareil" — ça libère un emplacement d'appareil lié avant de générer un nouveau QR.</p>
           </div>
           <div class="card rounded-2xl p-5">
             <h3 class="text-white font-semibold mb-3 text-sm">À propos de Hinata</h3>
@@ -654,6 +656,19 @@ async function reconnectWA() {
     </div>`;
   try {
     await fetch(`${API_URL}/api/whatsapp/reconnect`, { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+    startWAPolling();
+  } catch (e) {}
+}
+
+async function logoutWA() {
+  if (!confirm("Déconnecter Hinata et oublier cet appareil ? Il faudra rescanner un nouveau QR code.")) return;
+  document.getElementById('qrContainer').innerHTML = `
+    <div class="flex flex-col items-center gap-3 py-6">
+      <div style="width:32px;height:32px;border:2px solid rgba(239,68,68,.3);border-top-color:#ef4444;border-radius:50%;animation:spin 1s linear infinite"></div>
+      <p class="text-slate-500 text-xs text-center">Déconnexion de l'appareil…</p>
+    </div>`;
+  try {
+    await fetch(`${API_URL}/api/whatsapp/logout`, { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
     startWAPolling();
   } catch (e) {}
 }
