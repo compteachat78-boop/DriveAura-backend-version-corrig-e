@@ -10,16 +10,19 @@ import { v2 as cloudinary } from "cloudinary";
 import { Readable } from "stream";
 import jwt from "jsonwebtoken";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { toDataURL } from "qrcode";
 import Groq from "groq-sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
-import makeWASocket, {
+import baileysPkg from "@whiskeysockets/baileys";
+const {
+  makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-} from "@whiskeysockets/baileys";
+} = baileysPkg.default ?? baileysPkg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -661,6 +664,27 @@ app.get("/api/whatsapp/status", requireAdmin, (_req, res) => {
 
 app.post("/api/whatsapp/reconnect", requireAdmin, async (_req, res) => {
   try {
+    await initWhatsApp();
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ✅ NOUVEAU : déconnexion propre — libère le slot "appareil lié" côté
+// WhatsApp (contrairement à un simple redémarrage qui laisse l'appareil
+// fantôme dans la liste), puis efface la session locale et régénère un QR.
+app.post("/api/whatsapp/logout", requireAdmin, async (_req, res) => {
+  try {
+    if (sock) {
+      try { await sock.logout(); } catch (e) { console.error("[WhatsApp] Logout error:", e.message); }
+      try { sock.end(undefined); } catch {}
+      sock = null;
+    }
+    isConnected = false;
+    currentQR = null;
+    broadcastSSE("whatsapp-status", { connected: false });
+    if (fs.existsSync(AUTH_DIR)) {
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    }
     await initWhatsApp();
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
