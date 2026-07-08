@@ -211,16 +211,18 @@ const DEFAULT_PRICES = { permisB: 1250, permisMoto: 850, poidsLourd: 2400, vtcTa
 // tarifs stockés en base (PricesConfig) au lieu d'être écrit en dur, pour que
 // les modifications faites depuis le dashboard admin soient reflétées
 // immédiatement dans les réponses de Hinata.
-function buildSystemPrompt(prices, dossierContext) {
+function buildSystemPrompt(prices, dossierContext, linkAlreadySentRecently) {
   const p = { ...DEFAULT_PRICES, ...(prices || {}) };
   return `Tu es Hinata, secrétaire de direction de DriveAura. Tu réponds sur WhatsApp.
 
-RÈGLE N°1 ABSOLUE : Ta réponse fait 1 ou 2 phrases MAXIMUM. Jamais plus. Jamais de listes. Jamais de tirets.
+RÈGLE N°1 ABSOLUE : Ta réponse fait 1 ou 2 phrases MAXIMUM, jamais plus de 200 caractères. Jamais de listes. Jamais de tirets. Jamais de blocs de texte.
 RÈGLE N°2 : Tu écris comme un humain qui tape vite sur son téléphone. Naturel, direct, pas de formules robot.
 RÈGLE N°3 : Tu ne prononces jamais les noms des patrons. Tu dis "La Direction" uniquement.
-RÈGLE N°4 : Tu ne donnes jamais notre adresse. Tu renvoies vers autoecole-driveaura.fun.
-RÈGLE N°5 : SIREN 102 554 995 — seulement si le client demande explicitement des preuves de sérieux.
+RÈGLE N°4 : Tu ne donnes jamais notre adresse. Tu renvoies vers autoecole-driveaura.fun UNIQUEMENT si le client demande le site, comment s'inscrire, ou n'a jamais reçu ce lien. ${linkAlreadySentRecently ? "Tu as DÉJÀ donné ce lien récemment dans cette conversation : NE LE RÉPÈTE PAS sauf si le client le redemande explicitement." : ""}
+RÈGLE N°5 : SIREN 102 554 995 — seulement si le client demande explicitement des preuves de sérieux (ex: "vous êtes une arnaque ?", "vous êtes où ?", "c'est légal ?"). Ne le donne jamais spontanément.
 RÈGLE N°6 : Ne dis jamais explicitement que tu consultes "une base de données" ou "le système" — parle comme si tu le savais naturellement.
+RÈGLE N°7 : Tu réponds UNIQUEMENT à ce que le client vient de demander. N'ajoute jamais d'informations sur un permis, un prix ou un sujet qu'il n'a pas mentionné. Ne relance jamais plusieurs sujets à la fois.
+RÈGLE N°8 : Reste calme et posée. Si le client répète une question ou semble agacé, ne t'excuse pas de façon exagérée et ne redonne pas toutes les infos d'un coup — réponds simplement et brièvement au point précis soulevé.
 
 Ce que tu sais :
 - Permis B (Manuel/Auto) : ${p.permisB}€ | Moto A/A2 : ${p.permisMoto}€ | Poids Lourd C/CE+FIMO : ${p.poidsLourd}€ | VTC/Taxi : ${p.vtcTaxi}€
@@ -228,10 +230,10 @@ Ce que tu sais :
 - Paiement : Virement SEPA ou PayPal uniquement (pas de CB — traitement prioritaire)
 - Inscription : autoecole-driveaura.fun
 
-Exemples de bonnes réponses :
+Exemples de bonnes réponses (varie la formulation, ne les récite pas mot pour mot) :
 - "Permis B c'est ${p.permisB}€, garanti en 7 jours. Tu veux t'inscrire ?"
 - "On accepte virement SEPA ou PayPal, c'est pour garantir ton délai de 7 jours."
-- "Inscris-toi sur autoecole-driveaura.fun, la Direction s'occupe du reste."
+- "Oui bien sûr, c'est quoi ta question ?"
 
 Information réelle sur ce client (à utiliser uniquement s'il parle de son dossier/inscription) :
 ${dossierContext}`;
@@ -291,9 +293,16 @@ async function generateResponse(messages, newMessage, systemPrompt) {
   } catch { /* fallback */ }
 
   // 2. Gemini
+  // ✅ CORRECTION : sans generationConfig, Gemini ignorait la consigne de
+  // brièveté du prompt et pouvait générer des pavés de texte. On applique
+  // la même limite de longueur que Groq et OpenRouter.
   try {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY ?? "");
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: prompt });
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      systemInstruction: prompt,
+      generationConfig: { maxOutputTokens: 120, temperature: 0.6 },
+    });
     const chat = model.startChat({
       history: history.slice(0, -1).map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -318,6 +327,32 @@ async function generateResponse(messages, newMessage, systemPrompt) {
   } catch { /* all failed */ }
 
   return "Je suis momentanément indisponible, réessaie dans quelques minutes.";
+}
+
+// ✅ CORRECTION : garde-fou indépendant du modèle IA. Même si Groq/Gemini/
+// OpenRouter ignorent la consigne de brièveté du prompt, on force la
+// réponse à rester courte (1-2 phrases) et sans mise en forme (listes,
+// tirets, retours à la ligne multiples) avant de l'envoyer sur WhatsApp.
+function enforceReplyShape(reply) {
+  if (!reply) return reply;
+  let cleaned = reply
+    .replace(/\r/g, "")
+    .replace(/\n+/g, " ")
+    .replace(/^[\s•\-*]+/gm, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  const sentences = cleaned.match(/[^.!?]+[.!?]*/g) || [cleaned];
+  if (sentences.length > 2) {
+    cleaned = sentences.slice(0, 2).join(" ").trim();
+  }
+
+  const MAX_LEN = 260;
+  if (cleaned.length > MAX_LEN) {
+    cleaned = cleaned.slice(0, MAX_LEN).replace(/\s+\S*$/, "") + "…";
+  }
+
+  return cleaned;
 }
 
 // ─────────────────────────────────────────
@@ -503,9 +538,19 @@ async function handleWAMessage(jid, text) {
       PricesConfig.findOne({ key: "main" }).lean(),
       findDossierByJid(jid),
     ]);
-    const systemPrompt = buildSystemPrompt(pricesConfig, buildDossierContext(dossier));
 
-    const reply = await generateResponse(conv.messages, text, systemPrompt);
+    // ✅ CORRECTION : évite que Hinata renvoie le lien du site à chaque
+    // message — on vérifie s'il a déjà été donné dans les 6 derniers
+    // échanges de la conversation.
+    const recentMessages = conv.messages.slice(-6);
+    const linkAlreadySentRecently = recentMessages.some(
+      (m) => m.role === "assistant" && /autoecole-driveaura\.fun/i.test(m.content)
+    );
+
+    const systemPrompt = buildSystemPrompt(pricesConfig, buildDossierContext(dossier), linkAlreadySentRecently);
+
+    const rawReply = await generateResponse(conv.messages, text, systemPrompt);
+    const reply = enforceReplyShape(rawReply);
 
     const delay = Math.floor(Math.random() * 10000) + 20000;
     await sock.sendPresenceUpdate("composing", jid);
